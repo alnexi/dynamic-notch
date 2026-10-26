@@ -19,11 +19,12 @@ html, body, #root {
   background: transparent !important;
   user-select: none;
   -webkit-user-select: none;
-  pointer-events: none; /* Let non-droplet canvas pass mouse events straight to desktop */
+  pointer-events: none; /* Let non-interactive canvas pass mouse events straight to desktop */
 }
 
 /* Island container anchored flush against the top edge of the primary display */
 .island-wrapper {
+  position: relative;
   width: 100%;
   height: 100%;
   display: flex;
@@ -34,40 +35,46 @@ html, body, #root {
 }
 
 /* 
-  Organic Water Droplet Container
-  - Casts a soft, curved water drop shadow that strictly hugs the organic SVG silhouette
-  - Completely neutral grayscale: NO blue, NO cyan, NO green, NO artificial colored glow
+  =============================================================================
+  PHASE A: Attached Pendant Droplet
+  - Physically accurate pendant drop hanging from the horizontal screen bezel
+  - Narrow stem/neck at attachment point -> ballooning circular bulb below
+  - Fluid stretching under surface tension
+  =============================================================================
 */
-.droplet-container {
-  position: relative;
+.attached-droplet-container {
+  position: absolute;
+  top: 0;
   width: 120px;
   height: 48px;
   pointer-events: none;
-  transition: filter 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05);
+  transition:
+    opacity 0.32s ease,
+    transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.05),
+    filter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.05);
 }
 
-/* Restrained, soft water drop shadow following the droplet geometry */
-.droplet-container.proximity-idle {
+/* Soft, natural drop shadow following the exact pendant geometry */
+.attached-droplet-container.state-idle {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
 }
 
-.droplet-container.proximity-approaching {
+.attached-droplet-container.state-approaching {
   filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.16));
 }
 
-.droplet-container.proximity-near {
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.20)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.10));
+.attached-droplet-container.state-near {
+  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.20)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.10));
 }
 
-.droplet-container.proximity-hovered {
-  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.22)) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
+/* Smooth neck pinch-off and detachment transition */
+.attached-droplet-container.detaching-out {
+  opacity: 0;
+  transform: translateY(7px) scale(0.92);
+  pointer-events: none !important;
 }
 
-/* 
-  Optical Refraction Backdrop
-  - Clipped via SVG clip-path to the exact organic droplet contour
-  - Clear, vivid, restrained optical blur — not foggy or milky
-*/
+/* Optical blur clipped strictly to the pendant drop contour */
 .droplet-backdrop {
   position: absolute;
   top: 0;
@@ -76,11 +83,11 @@ html, body, #root {
   height: 48px;
   backdrop-filter: blur(8px) saturate(130%) contrast(105%) brightness(102%);
   -webkit-backdrop-filter: blur(8px) saturate(130%) contrast(105%) brightness(102%);
-  clip-path: url(#droplet-clip);
+  clip-path: url(#attached-drop-clip);
   pointer-events: none;
 }
 
-/* SVG Droplet Layer */
+/* SVG Pendant Droplet Layer */
 .water-droplet-svg {
   position: absolute;
   top: 0;
@@ -91,31 +98,27 @@ html, body, #root {
   pointer-events: none;
 }
 
-/* 
-  Water Droplet Body & Highlights
-  - Smooth morphing transitions across all proximity states
-  - Pointer events only on the actual fluid shape
-*/
-.water-droplet-body {
-  pointer-events: auto; /* Only the droplet body intercepts clicks & hover */
+/* Droplet body and highlights */
+.droplet-body {
+  pointer-events: auto; /* Only the droplet body intercepts clicks */
   cursor: pointer;
   transition:
     d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
     opacity 0.45s ease;
 }
 
-.water-droplet-clip-path {
+.droplet-clip-path {
   transition: d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05);
 }
 
-.water-droplet-meniscus {
+.droplet-meniscus {
   pointer-events: none;
   transition:
     d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
     opacity 0.45s ease;
 }
 
-.water-droplet-bottom-rim {
+.droplet-bottom-rim {
   pointer-events: none;
   transition:
     d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
@@ -123,77 +126,136 @@ html, body, #root {
 }
 
 /* 
-  Proximity Stage 0: Idle (Nearly hidden contact bead)
+  State 0: Idle (Nearly invisible contact dewdrop at top bezel)
 */
-.proximity-idle .water-droplet-body,
-.proximity-idle .water-droplet-clip-path {
-  d: path("M 54,0 C 53.5,1 53,2 52,3 C 51.5,4 51,5 51,5.5 C 51,6.5 54,7.5 60,7.5 C 66,7.5 69,6.5 69,5.5 C 69,5 68.5,4 68,3 C 67,2 66.5,1 66,0 Z");
+.state-idle .droplet-body,
+.state-idle .droplet-clip-path {
+  d: path("M 56,0 C 56,1.5 56.5,3 57.5,4 C 58.5,4.8 61.5,4.8 62.5,4 C 63.5,3 64,1.5 64,0 Z");
   opacity: 0.85;
 }
 
-.proximity-idle .water-droplet-meniscus {
-  d: path("M 53,1.5 C 52.5,2.5 52,3.5 51.5,4.5 C 51.5,5 51.5,5.5 52,6");
-  opacity: 0.65;
+.state-idle .droplet-meniscus {
+  d: path("M 57,1 C 57.5,2 58.5,3 60,3.2");
+  opacity: 0.60;
 }
 
-.proximity-idle .water-droplet-bottom-rim {
-  d: path("M 53,6.5 C 55,7.2 59,7.5 61,7.4 C 64,7.2 66,6.5 67,6");
-  opacity: 0.50;
+.state-idle .droplet-bottom-rim {
+  d: path("M 58,4 C 59.5,4.6 60.5,4.6 62,4");
+  opacity: 0.45;
 }
 
 /* 
-  Proximity Stage 1: Approaching (Emerges and stretches downward)
+  State 1: Approaching (Draws downward: narrow 10px neck, 26px round bulb)
 */
-.proximity-approaching .water-droplet-body,
-.proximity-approaching .water-droplet-clip-path {
-  d: path("M 52,0 C 51,2 50,5 48,8 C 46,12 45,14 45,16 C 45,19 51,20 59.8,20 C 68,20 75,19 75,15.5 C 75,13.5 73,11 71,7.5 C 69.5,4.5 68.5,2 68,0 Z");
-  opacity: 0.90;
+.state-approaching .droplet-body,
+.state-approaching .droplet-clip-path {
+  d: path("M 55,0 C 55,2.5 54.5,5 54,7 C 53,10 47,12.5 47,15.5 C 47,18 53,19.5 60,19.5 C 67,19.5 73,18 73,15.5 C 73,12.5 67,10 66,7 C 65.5,5 65,2.5 65,0 Z");
+  opacity: 0.92;
 }
 
-.proximity-approaching .water-droplet-meniscus {
-  d: path("M 49,3 C 48,6 46,10 45,13 C 45,14 45,15 46,16");
-  opacity: 0.78;
+.state-approaching .droplet-meniscus {
+  d: path("M 54.5,6 C 53,9.5 48.5,12 48,15");
+  opacity: 0.80;
 }
 
-.proximity-approaching .water-droplet-bottom-rim {
-  d: path("M 48,18 C 51,19.5 58,20 61,19.8 C 66,19.2 71,17.5 72,16");
+.state-approaching .droplet-bottom-rim {
+  d: path("M 52,18 C 56,19.5 64,19.5 68,18");
   opacity: 0.60;
 }
 
 /* 
-  Proximity Stage 2: Near (Deepens into distinct hanging teardrop)
+  State 2: Near (Attached-Stretched: narrow 7px waist, 44px plump bulb, ready to pinch off)
 */
-.proximity-near .water-droplet-body,
-.proximity-near .water-droplet-clip-path {
-  d: path("M 50,0 C 49,3 47,7 45,12 C 42,18 39,21 39,25 C 39,29 48,31 59.5,31 C 71,31 81,28 81,24 C 81,20 76,17 73,11 C 71,7 70.5,3 70,0 Z");
-  opacity: 0.95;
+.state-near .droplet-body,
+.state-near .droplet-clip-path {
+  d: path("M 56,0 C 56,3 56.5,6 56.5,9 C 56.5,14 38,18 38,25 C 38,31 47,35 60,35 C 73,35 82,31 82,25 C 82,18 63.5,14 63.5,9 C 63.5,6 64,3 64,0 Z");
+  opacity: 1;
 }
 
-.proximity-near .water-droplet-meniscus {
-  d: path("M 47,4 C 45,9 42,15 40,19 C 39,21 39,23 40,25");
-  opacity: 0.88;
+.state-near .droplet-meniscus {
+  d: path("M 56,8 C 54,14 41,19 40,25 C 40,28 42,31 45,33");
+  opacity: 0.90;
 }
 
-.proximity-near .water-droplet-bottom-rim {
-  d: path("M 44,28 C 49,30.5 58,31 62,30.8 C 69,30 75,27.5 77,25");
+.state-near .droplet-bottom-rim {
+  d: path("M 46,33 C 53,35 67,35 74,33");
   opacity: 0.70;
 }
 
 /* 
-  Proximity Stage 3: Hovered / Expanded (Full luscious hanging water droplet)
+  =============================================================================
+  PHASE B: Detached Interaction Capsule
+  - Visibly separated from the top screen edge by a crisp 7px air gap
+  - Translucent smoked-glass capsule geometry
+  - Stable, intentional, compact panel for interaction
+  =============================================================================
 */
-.proximity-hovered .water-droplet-body,
-.proximity-hovered .water-droplet-clip-path {
-  d: path("M 48,0 C 47,4 45,10 42,16 C 38,24 31,28 31,34 C 31,40 43,42.5 59,42 C 75,41.5 89,38 89,33 C 89,27 82,23 77,15 C 74,10 73,4 72,0 Z");
+.detached-capsule-container {
+  position: absolute;
+  top: 7px; /* 7px air gap separating the capsule from the screen bezel */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-8px) scale(0.92);
+  transition:
+    opacity 0.35s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.detached-capsule-container.visible {
   opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
-.proximity-hovered .water-droplet-meniscus {
-  d: path("M 45,6 C 43,12 39,20 34,26 C 32,29 32,32 33,34");
-  opacity: 0.95;
+.detached-capsule {
+  position: relative;
+  width: 136px;
+  height: 32px;
+  border-radius: 16px;
+  overflow: hidden;
+  cursor: pointer;
+
+  /* Translucent smoked glass: darker than water droplet, but desktop remains visible */
+  background: linear-gradient(
+    180deg,
+    rgba(30, 34, 42, 0.76) 0%,
+    rgba(14, 16, 22, 0.88) 100%
+  );
+
+  backdrop-filter: blur(16px) saturate(145%) contrast(108%);
+  -webkit-backdrop-filter: blur(16px) saturate(145%) contrast(108%);
+
+  /* Delicate hairline edge highlight */
+  border: 1px solid rgba(255, 255, 255, 0.16);
+
+  /* Inner specular reflection + soft ambient grounding shadow */
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.25),
+    0 6px 18px -2px rgba(0, 0, 0, 0.32),
+    0 2px 5px rgba(0, 0, 0, 0.18);
+
+  transition:
+    background 0.35s ease,
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
 }
 
-.proximity-hovered .water-droplet-bottom-rim {
-  d: path("M 38,38 C 45,41.5 58,42 63,41.8 C 72,41 81,37.5 84,34");
-  opacity: 0.80;
+/* Subtle curved specular sheen along top of detached capsule */
+.capsule-sheen {
+  position: absolute;
+  top: 1px;
+  left: 10%;
+  right: 10%;
+  height: 45%;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.20) 0%,
+    rgba(255, 255, 255, 0.03) 60%,
+    transparent 100%
+  );
+  pointer-events: none;
 }

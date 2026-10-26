@@ -10,34 +10,23 @@ export interface ProximityPayload {
   dy: number;
 }
 
-// Organic SVG droplet path definitions for each proximity stage
-const DROPLET_PATHS: Record<
-  ProximityLevel,
-  {
-    body: string;
-    meniscus: string;
-    bottomRim: string;
-  }
-> = {
+// Organic SVG pendant droplet paths for attached states (narrow neck -> bulbous body)
+// Inspired by physical fluid mechanics: narrow stem at ceiling, swelling into a round spherical bulb.
+const ATTACHED_DROP_PATHS = {
   idle: {
-    body: "M 54,0 C 53.5,1 53,2 52,3 C 51.5,4 51,5 51,5.5 C 51,6.5 54,7.5 60,7.5 C 66,7.5 69,6.5 69,5.5 C 69,5 68.5,4 68,3 C 67,2 66.5,1 66,0 Z",
-    meniscus: "M 53,1.5 C 52.5,2.5 52,3.5 51.5,4.5 C 51.5,5 51.5,5.5 52,6",
-    bottomRim: "M 53,6.5 C 55,7.2 59,7.5 61,7.4 C 64,7.2 66,6.5 67,6",
+    body: "M 56,0 C 56,1.5 56.5,3 57.5,4 C 58.5,4.8 61.5,4.8 62.5,4 C 63.5,3 64,1.5 64,0 Z",
+    meniscus: "M 57,1 C 57.5,2 58.5,3 60,3.2",
+    bottomRim: "M 58,4 C 59.5,4.6 60.5,4.6 62,4",
   },
   approaching: {
-    body: "M 52,0 C 51,2 50,5 48,8 C 46,12 45,14 45,16 C 45,19 51,20 59.8,20 C 68,20 75,19 75,15.5 C 75,13.5 73,11 71,7.5 C 69.5,4.5 68.5,2 68,0 Z",
-    meniscus: "M 49,3 C 48,6 46,10 45,13 C 45,14 45,15 46,16",
-    bottomRim: "M 48,18 C 51,19.5 58,20 61,19.8 C 66,19.2 71,17.5 72,16",
+    body: "M 55,0 C 55,2.5 54.5,5 54,7 C 53,10 47,12.5 47,15.5 C 47,18 53,19.5 60,19.5 C 67,19.5 73,18 73,15.5 C 73,12.5 67,10 66,7 C 65.5,5 65,2.5 65,0 Z",
+    meniscus: "M 54.5,6 C 53,9.5 48.5,12 48,15",
+    bottomRim: "M 52,18 C 56,19.5 64,19.5 68,18",
   },
   near: {
-    body: "M 50,0 C 49,3 47,7 45,12 C 42,18 39,21 39,25 C 39,29 48,31 59.5,31 C 71,31 81,28 81,24 C 81,20 76,17 73,11 C 71,7 70.5,3 70,0 Z",
-    meniscus: "M 47,4 C 45,9 42,15 40,19 C 39,21 39,23 40,25",
-    bottomRim: "M 44,28 C 49,30.5 58,31 62,30.8 C 69,30 75,27.5 77,25",
-  },
-  hovered: {
-    body: "M 48,0 C 47,4 45,10 42,16 C 38,24 31,28 31,34 C 31,40 43,42.5 59,42 C 75,41.5 89,38 89,33 C 89,27 82,23 77,15 C 74,10 73,4 72,0 Z",
-    meniscus: "M 45,6 C 43,12 39,20 34,26 C 32,29 32,32 33,34",
-    bottomRim: "M 38,38 C 45,41.5 58,42 63,41.8 C 72,41 81,37.5 84,34",
+    body: "M 56,0 C 56,3 56.5,6 56.5,9 C 56.5,14 38,18 38,25 C 38,31 47,35 60,35 C 73,35 82,31 82,25 C 82,18 63.5,14 63.5,9 C 63.5,6 64,3 64,0 Z",
+    meniscus: "M 56,8 C 54,14 41,19 40,25 C 40,28 42,31 45,33",
+    bottomRim: "M 46,33 C 53,35 67,35 74,33",
   },
 };
 
@@ -104,14 +93,20 @@ function App() {
   // Compute effective state: direct pointer hover takes highest precedence,
   // followed by native cursor proximity stages.
   const effectiveState: ProximityLevel = isPointerInside ? "hovered" : proximity;
-  const currentPaths = DROPLET_PATHS[effectiveState];
+  const isDetached = effectiveState === "hovered";
+  const attachedKey = effectiveState === "hovered" ? "near" : effectiveState;
+  const currentPaths = ATTACHED_DROP_PATHS[attachedKey];
 
   return (
     <div className="island-wrapper" data-tauri-drag-region>
-      <div className={`droplet-container proximity-${effectiveState}`}>
-        {/* Optical blur layer clipped to the exact organic droplet path */}
+      {/* PHASE A: Attached Pendant Droplet (Active in idle, approaching, near) */}
+      <div
+        className={`attached-droplet-container state-${effectiveState} ${
+          isDetached ? "detaching-out" : ""
+        }`}
+        data-tauri-drag-region
+      >
         <div className="droplet-backdrop" />
-
         <svg
           className="water-droplet-svg"
           viewBox="0 0 120 48"
@@ -119,36 +114,27 @@ function App() {
           height="48"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          onMouseEnter={() => setIsPointerInside(true)}
-          onMouseLeave={() => setIsPointerInside(false)}
-          data-tauri-drag-region
-          aria-label="Nova Island Water Droplet"
-          data-proximity-level={effectiveState}
         >
           <defs>
-            {/* Organic droplet clipping path for optical backdrop filter */}
-            <clipPath id="droplet-clip" clipPathUnits="userSpaceOnUse">
-              <path className="water-droplet-clip-path" d={currentPaths.body} />
+            <clipPath id="attached-drop-clip" clipPathUnits="userSpaceOnUse">
+              <path className="droplet-clip-path" d={currentPaths.body} />
             </clipPath>
 
-            {/* Clear water gradient: strictly neutral grayscale, NO blue or cyan tint */}
-            <linearGradient id="water-gradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.16" />
-              <stop offset="25%" stopColor="#ffffff" stopOpacity="0.04" />
+            <linearGradient id="attached-water-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.14" />
+              <stop offset="30%" stopColor="#ffffff" stopOpacity="0.04" />
               <stop offset="70%" stopColor="#000000" stopOpacity="0.14" />
               <stop offset="100%" stopColor="#000000" stopOpacity="0.22" />
             </linearGradient>
 
-            {/* Continuous curved meniscus highlight along left boundary */}
-            <linearGradient id="meniscus-stroke" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id="attached-meniscus-stroke" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
-              <stop offset="25%" stopColor="#ffffff" stopOpacity="0.75" />
+              <stop offset="30%" stopColor="#ffffff" stopOpacity="0.75" />
               <stop offset="75%" stopColor="#ffffff" stopOpacity="0.60" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </linearGradient>
 
-            {/* Continuous curved bottom caustic highlight */}
-            <linearGradient id="bottom-rim-stroke" x1="0" y1="0" x2="1" y2="0">
+            <linearGradient id="attached-bottom-rim-stroke" x1="0" y1="0" x2="1" y2="0">
               <stop offset="0%" stopColor="#ffffff" stopOpacity="0" />
               <stop offset="35%" stopColor="#ffffff" stopOpacity="0.45" />
               <stop offset="65%" stopColor="#ffffff" stopOpacity="0.55" />
@@ -156,31 +142,40 @@ function App() {
             </linearGradient>
           </defs>
 
-          {/* Liquid water droplet body */}
           <path
-            className="water-droplet-body"
+            className="droplet-body"
             d={currentPaths.body}
-            fill="url(#water-gradient)"
+            fill="url(#attached-water-gradient)"
           />
-
-          {/* Left curved meniscus reflection */}
           <path
-            className="water-droplet-meniscus"
+            className="droplet-meniscus"
             d={currentPaths.meniscus}
-            stroke="url(#meniscus-stroke)"
+            stroke="url(#attached-meniscus-stroke)"
             strokeWidth="1.2"
             strokeLinecap="round"
           />
-
-          {/* Bottom curved rim reflection */}
           <path
-            className="water-droplet-bottom-rim"
+            className="droplet-bottom-rim"
             d={currentPaths.bottomRim}
-            stroke="url(#bottom-rim-stroke)"
+            stroke="url(#attached-bottom-rim-stroke)"
             strokeWidth="0.8"
             strokeLinecap="round"
           />
         </svg>
+      </div>
+
+      {/* PHASE B: Detached Interaction Capsule (Separates with real gap at top: 7px) */}
+      <div
+        className={`detached-capsule-container ${isDetached ? "visible" : ""}`}
+        onMouseEnter={() => setIsPointerInside(true)}
+        onMouseLeave={() => setIsPointerInside(false)}
+        data-tauri-drag-region
+        aria-label="Nova Island Detached Capsule"
+        data-proximity-level={effectiveState}
+      >
+        <div className="detached-capsule">
+          <div className="capsule-sheen" />
+        </div>
       </div>
     </div>
   );

@@ -79,7 +79,7 @@ impl Default for ProximityConfig {
 /// given horizontal distance `dx` from island center and vertical distance `dy` from top edge.
 pub fn compute_proximity(dx: f32, dy: f32, config: &ProximityConfig) -> (ProximityLevel, f32) {
     let effective_dist = ((dx / config.aspect_ratio).powi(2) + dy.powi(2)).sqrt();
-    let is_in_droplet = dx <= 42.0 && dy <= 45.0;
+    let is_in_droplet = dx <= 68.0 && dy <= 45.0;
 
     let level = if is_in_droplet || effective_dist <= config.hovered_threshold {
         ProximityLevel::Hovered
