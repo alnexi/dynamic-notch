@@ -1,49 +1,47 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import "./App.css";
 
-export type ProximityLevel = "idle" | "approaching" | "near" | "hovered";
+export type ProximityLevel = "idle" | "approaching" | "hovered";
 
 export interface ProximityPayload {
   level: ProximityLevel;
-  distance: number;
-  dx: number;
-  dy: number;
+  cursor_x: number;
+  cursor_y: number;
+  anchor_x: number;
+  offset_x: number;
+  is_locked: boolean;
 }
 
 function App() {
   const [proximity, setProximity] = useState<ProximityLevel>("idle");
-  const [isPointerInside, setIsPointerInside] = useState(false);
+  const [offsetX, setOffsetX] = useState<number>(120);
+  const [isActivated, setIsActivated] = useState<boolean>(false);
 
-  useEffect(() => {
-    // Top-center positioning for native Tauri desktop window
-    async function setupNativeWindow() {
-      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-        try {
-          const { getCurrentWindow, primaryMonitor, PhysicalPosition } = await import(
-            "@tauri-apps/api/window"
-          );
-          const appWindow = getCurrentWindow();
-          const monitor = await primaryMonitor();
-          if (monitor) {
-            const scale = monitor.scaleFactor;
-            const monitorWidth = monitor.size.width;
-            const winWidth = 240 * scale;
-            const x = Math.round((monitorWidth - winWidth) / 2);
-            const y = 0; // Flush with top edge of primary display
-            await appWindow.setPosition(new PhysicalPosition(x, y));
-          }
-          await appWindow.show();
-        } catch {
-          // Fallback handled by native Rust setup hook
-        }
+  // Helper to emit events to Rust backend
+  const emitUnlock = useCallback(async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("nova-unlock-anchor", {});
+      } catch (err) {
+        console.warn("Failed to emit nova-unlock-anchor:", err);
       }
     }
-
-    setupNativeWindow();
   }, []);
 
+  const emitLock = useCallback(async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("nova-lock-anchor", {});
+      } catch (err) {
+        console.warn("Failed to emit nova-lock-anchor:", err);
+      }
+    }
+  }, []);
+
+  // Listen for native cursor proximity changes & anchor coordinates from Rust
   useEffect(() => {
-    // Listen for native cursor proximity changes from Rust
     let unlisten: (() => void) | undefined;
 
     async function subscribeProximity() {
@@ -51,8 +49,19 @@ function App() {
         try {
           const { listen } = await import("@tauri-apps/api/event");
           unlisten = await listen<ProximityPayload>("nova-proximity", (event) => {
-            if (event.payload && event.payload.level) {
-              setProximity(event.payload.level);
+            const p = event.payload;
+            if (p) {
+              if (p.level) {
+                setProximity(p.level);
+              }
+              if (typeof p.offset_x === "number") {
+                setOffsetX(p.offset_x);
+              }
+              if (p.level === "hovered" || p.is_locked) {
+                setIsActivated(true);
+              } else if (p.level === "idle") {
+                setIsActivated(false);
+              }
             }
           });
         } catch (err) {
@@ -70,20 +79,64 @@ function App() {
     };
   }, []);
 
-  // Direct pointer hover takes highest precedence, followed by native proximity stages
-  const effectiveState: ProximityLevel = isPointerInside ? "hovered" : proximity;
+  // Keyboard and window blur handling for dismissing / unlocking
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsActivated(false);
+        setProximity("idle");
+        emitUnlock();
+      }
+    };
+
+    const handleBlur = () => {
+      setIsActivated(false);
+      emitUnlock();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [emitUnlock]);
+
+  const handleMouseEnter = () => {
+    setIsActivated(true);
+    emitLock();
+  };
+
+  const handleMouseLeave = () => {
+    setIsActivated(false);
+    emitUnlock();
+  };
+
+  // Direct activation takes highest precedence, then proximity states
+  const effectiveState: ProximityLevel = isActivated || proximity === "hovered"
+    ? "hovered"
+    : proximity === "approaching"
+    ? "approaching"
+    : "idle";
 
   return (
-    <div className="island-wrapper" data-tauri-drag-region>
+    <div
+      className="island-wrapper"
+      data-tauri-drag-region
+      style={{ "--bubble-offset": `${offsetX}px` } as React.CSSProperties}
+    >
       {/* 
-        Single continuous morphing glass element:
-        Smoothly transforms from a partially hidden glass bubble at the top bezel
-        into a wide, dark, translucent interaction capsule upon full activation.
+        Pointer-Anchored Morphing Glass Bubble:
+        - When idle: completely invisible, letting all clicks pass straight through.
+        - When pointer approaches top edge: smoothly emerges at pointer's horizontal X position.
+        - When pointer enters bubble: freezes anchor X and expands into horizontal capsule right there.
+        - Fully transparent glass material preserved across every state.
       */}
       <div
         className={`glass-bubble state-${effectiveState}`}
-        onMouseEnter={() => setIsPointerInside(true)}
-        onMouseLeave={() => setIsPointerInside(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         data-tauri-drag-region
         aria-label="Nova Island Glass Bubble"
         data-proximity-level={effectiveState}

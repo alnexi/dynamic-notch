@@ -27,34 +27,35 @@ html, body, #root {
   position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
   background: transparent;
   pointer-events: none;
 }
 
 /* 
   =============================================================================
-  Nova Island — Premium Transparent Glass Bubble + Motion Graphics
-  - Single continuous morphing element: rounded glass bubble -> horizontal capsule
-  - Consistent full transparency in every visual state (including expanded capsule)
-  - Desktop and wallpaper remain clearly visible through both bubble and capsule
-  - Polished motion graphics with controlled scale, position, and subtle overshoot
-  - Strictly zero dots, zero LEDs, zero dark/opaque fills
+  Nova Island — Pointer-Anchored Transparent Glass Bubble & Capsule
+  - Tracks pointer horizontal position across the entire top edge of the monitor
+  - Idle state: completely invisible (opacity: 0, pointer-events: none)
+  - Approaching: emerges at current pointer X coordinate along top edge
+  - Activation: freezes anchor X and expands capsule horizontally right at cursor
+  - Deactivation: pressing Escape, clicking outside, or leaving smoothly collapses
+  - Strictly preserves 100% transparent glass material across every state
+  - Zero dots, zero LEDs, zero dark/opaque fills
   =============================================================================
 */
 .glass-bubble {
-  position: relative;
-  margin: 0 auto;
-  pointer-events: auto; /* Only the bubble intercepts mouse events */
+  position: absolute;
+  top: 0;
+  left: var(--bubble-offset, 120px);
+  pointer-events: auto; /* Intercepts mouse events when active/visible */
   cursor: pointer;
   overflow: hidden;
+  transform-origin: center top;
 
   /* 
     Consistent transparent glass material across EVERY state:
-    Preserves the exact same light smoky transparency in idle, approaching, near,
-    and expanded capsule states. Never darkens or becomes opaque.
+    Preserves light smoky transparency in idle, approaching, and expanded capsule states.
+    Never darkens or becomes opaque.
   */
   background: linear-gradient(
     180deg,
@@ -77,15 +78,16 @@ html, body, #root {
     inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
     0 4px 14px rgba(0, 0, 0, 0.18);
 
-  /* Polished motion-graphics transition with controlled settle */
+  /* Polished motion-graphics transition with spring-like settle */
   transition:
-    width 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    height 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    border-radius 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    transform 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    box-shadow 0.38s ease,
-    border-color 0.38s ease;
-  will-change: width, height, border-radius, transform, box-shadow;
+    width 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    height 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    border-radius 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    transform 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    opacity 0.25s ease,
+    box-shadow 0.32s ease,
+    border-color 0.32s ease;
+  will-change: width, height, border-radius, transform, opacity, box-shadow;
 }
 
 /* Subtle curved specular sheen on top curve of the glass */
@@ -105,26 +107,28 @@ html, body, #root {
   pointer-events: none;
   opacity: 0.75;
   transition:
-    opacity 0.38s ease,
-    left 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    right 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    height 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    border-radius 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05);
+    opacity 0.32s ease,
+    left 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    right 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    height 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    border-radius 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05);
 }
 
 /* 
   -----------------------------------------------------------------------------
   State 0: Idle
-  - Bubble is almost entirely hidden behind the screen top edge
-  - Only a tiny curved glass rim (~8px) is visible resting at the top bezel
-  - Same transparent glass material, no dark fills or dots
+  - Completely invisible when cursor is away from the top edge
+  - pointer-events: none guarantees total click-through everywhere
+  - Positioned slightly retracted above the top bezel
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-idle {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  transform: translateY(-24px);
+  transform: translateX(-50%) translateY(-36px);
+  opacity: 0;
+  pointer-events: none;
 
   border-color: rgba(255, 255, 255, 0.16);
 
@@ -135,7 +139,7 @@ html, body, #root {
 }
 
 .glass-bubble.state-idle .glass-specular {
-  opacity: 0.65;
+  opacity: 0;
   left: 12%;
   right: 12%;
   height: 45%;
@@ -143,17 +147,19 @@ html, body, #root {
 
 /* 
   -----------------------------------------------------------------------------
-  State 1: Approaching
-  - Bubble smoothly emerges downward from the bezel
-  - Scales up slightly to 38px, revealing its rounded spherical glass dome
-  - Fluid motion graphics with intentional, controlled positioning
+  State 1: Approaching (Pointer Tracking)
+  - Emerges smoothly at the pointer's horizontal position along the top edge
+  - Spherical bubble dome (38x38px) following cursor horizontally
+  - Full transparency, no dots or marks
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-approaching {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  transform: translateY(-8px);
+  transform: translateX(-50%) translateY(-8px);
+  opacity: 1;
+  pointer-events: auto;
 
   border-color: rgba(255, 255, 255, 0.18);
 
@@ -172,47 +178,22 @@ html, body, #root {
 
 /* 
   -----------------------------------------------------------------------------
-  State 2: Near (Anticipation / Full Bubble Reveal)
-  - Bubble fully emerges below the screen edge
-  - Softly oval shape (44x40px) as anticipation for horizontal expansion
-  -----------------------------------------------------------------------------
-*/
-.glass-bubble.state-near {
-  width: 44px;
-  height: 40px;
-  border-radius: 22px;
-  transform: translateY(-2px);
-
-  border-color: rgba(255, 255, 255, 0.20);
-
-  box-shadow:
-    inset 0 1px 1.4px rgba(255, 255, 255, 0.35),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.15),
-    0 5px 14px rgba(0, 0, 0, 0.20);
-}
-
-.glass-bubble.state-near .glass-specular {
-  opacity: 0.80;
-  left: 9%;
-  right: 9%;
-  height: 48%;
-}
-
-/* 
-  -----------------------------------------------------------------------------
-  State 3: Fully Activated (Hovered)
-  - Continuous morph: bubble smoothly widens horizontally into a sleek capsule
+  State 2: Fully Activated (Hovered / Expanded Capsule)
+  - Anchor X is FROZEN at cursor entry position (does NOT jump to center)
+  - Capsule expands horizontally (148x34px) symmetrically around anchor X
   - Settles 4px below the bezel with a gentle, controlled overshoot
   - RETAINS FULL TRANSPARENCY: exactly the same base color, glass material,
     and see-through clarity as the bubble. Never darkens or becomes opaque.
-  - Smooth 17px rounded ends, zero dots or LEDs
+  - Dismissed via Escape key, moving away, or clicking outside
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-hovered {
   width: 148px;
   height: 34px;
   border-radius: 17px;
-  transform: translateY(4px);
+  transform: translateX(-50%) translateY(4px);
+  opacity: 1;
+  pointer-events: auto;
 
   /* Delicate hairline highlight matching the bubble */
   border-color: rgba(255, 255, 255, 0.20);

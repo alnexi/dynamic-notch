@@ -1,6 +1,6 @@
 # Nova Island
 
-Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives as an unobtrusive, premium transparent glass bubble partially concealed at the top-center edge of the primary monitor that smoothly emerges and morphs into a sleek, translucent interaction capsule as the cursor approaches or hovers.
+Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass bubble that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
 ---
 
@@ -13,27 +13,25 @@ Nova Island is under active phased development.
 - **Phase 1: Project Foundation**
   - Frameless, titlebar-less desktop window with native OS transparency support.
   - Pinned on top of ordinary desktop windows (`alwaysOnTop`).
-  - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`, centered horizontally).
+  - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`).
   - Click-through transparency: Window regions outside the bubble/capsule use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
 - **Phase 2: Premium Transparent Glass Bubble + Motion Graphics**
-  - **New Visual Identity**: Smooth, spherical glass bubble with subtle optical depth, replacing the previous water droplet concept.
+  - **Visual Identity**: Smooth, spherical glass bubble with subtle optical depth and refined specular reflections.
   - **Continuous Morphing Animation**: A single continuous glass element that widens and morphs from a hanging spherical bubble into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
   - **Translucent Smoky Glass**: Refined neutral backdrop blur (`blur(16px) saturate(140%) contrast(106%)`) and consistent smoky glass transparency across every state, ensuring desktop wallpapers, text, and active windows remain visible through the glass at all times.
   - **Preserved Full Transparency in Capsule**: The capsule never changes to a darker or opaque fill upon activation, preserving the exact same base color and see-through clarity as the bubble throughout the entire morph.
   - **Curved Specular Sheen**: Dynamic overhead light reflection that smoothly reshapes in tandem with the glass body.
   - **Zero Indicator Artifacts**: 100% clean and minimal—strictly free of blue/cyan dots, green LEDs, or artificial glowing indicators.
-- **Phase 3: Native Cursor Proximity Detection**
-  - Low-overhead Win32 `GetCursorPos` polling thread (30ms interval, 0.0% CPU overhead, no global hook).
-  - High-DPI physical-to-logical coordinate translation relative to the primary display.
-  - Elliptical interaction halo matching the natural proportions of the island.
-  - Progressive 4-stage proximity state machine:
-    - **Idle** ($> 240\text{ px}$): Compact $32 \times 32\text{ px}$ bubble tucked behind the top bezel (`translateY(-24px)`), with only the bottom ~8px curved glass rim visible.
-    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Smoothly emerges downward ($38 \times 38\text{ px}$, `translateY(-8px)`), revealing its round spherical glass dome.
-    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Fully emerged softly oval bubble ($44 \times 40\text{ px}$, `translateY(-2px)`), anticipating activation.
-    - **Hovered / Activated** ($d \le 45\text{ px}$ or cursor inside capsule): Morphs continuously into a sleek $148 \times 34\text{ px}$ horizontal capsule settling 4px below bezel with subtle overshoot, retaining full glass transparency.
-  - Built-in 200ms anti-flicker hysteresis cooldown on exit transitions.
-  - Strict zero focus stealing: The background proximity engine reads global coordinates without ever activating or stealing focus from active windows.
-  - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
+- **Phase 3: Pointer-Anchored Tracking & Native Proximity**
+  - **Full Top-Edge Horizontal Tracking**: The bubble and capsule are anchored directly to the user's horizontal cursor position ($X$) along the entire top edge of the primary display rather than being locked to screen center:
+    - Approaching near the far left $\rightarrow$ bubble emerges near the left edge.
+    - Approaching near the center $\rightarrow$ bubble emerges at the center.
+    - Approaching near the far right $\rightarrow$ bubble emerges near the right edge.
+  - **Edge Clamping**: Intelligent boundary clamping prevents the $148\text{ px}$ capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
+  - **Frozen Anchor on Activation**: When the cursor enters the bubble, the anchor coordinate freezes, and the capsule expands symmetrically right at the cursor's entry point without jumping to center or drifting during interaction.
+  - **Keyboard & Click-Outside Dismissal**: Pressing `Escape` or clicking outside immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
+  - **100% Invisible Idle State**: When the mouse is not near the top edge, the island is completely invisible with `pointer-events: none`, ensuring complete desktop click-through.
+  - **Win32 Lifecycle Guard**: Native named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
 
 ### Planned Features (Future Phases)
 
@@ -95,7 +93,7 @@ npm.cmd run tauri dev
 ```
 
 ### 5. Run Rust Unit Tests
-Runs unit tests for the cursor proximity distance engine and geometry thresholds:
+Runs unit tests for pointer tracking math and monitor edge clamping:
 ```powershell
 cd src-tauri
 cargo test
@@ -127,8 +125,8 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 ├── .vscode/                 # Recommended editor configuration
 ├── public/                  # Static assets and icons
 ├── src/                     # React frontend
-│   ├── App.tsx              # Nova Island component & proximity listener
-│   ├── App.css              # Liquid water droplet styling, caustics & easing
+│   ├── App.tsx              # Nova Island component, anchor tracking & key listener
+│   ├── App.css              # Transparent glass styling & motion graphics
 │   ├── main.tsx             # React DOM root entry point
 │   └── vite-env.d.ts        # Vite environment typings
 ├── src-tauri/               # Native Rust application layer
@@ -137,8 +135,8 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 │   ├── icons/               # Windows desktop application icons
 │   ├── src/
 │   │   ├── main.rs          # Win32 lifecycle guard, mutex & entry point
-│   │   ├── lib.rs           # Window setup, primary monitor centering & Tauri run loop
-│   │   └── proximity.rs     # Win32 cursor proximity detector & distance math
+│   │   ├── lib.rs           # Window setup, anchor locking & Tauri run loop
+│   │   └── proximity.rs     # Win32 cursor tracking & edge clamping engine
 │   ├── Cargo.toml           # Rust package configuration & dependencies
 │   ├── build.rs             # Tauri build script
 │   └── tauri.conf.json      # Window size, transparency & bundle config
