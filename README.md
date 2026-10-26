@@ -1,6 +1,6 @@
 # Nova Island
 
-Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives as an unobtrusive, crystal-clear water droplet hanging from the top-center edge of the primary monitor that organically stretches and emerges downward with liquid surface tension as the cursor approaches or hovers.
+Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives as an unobtrusive, premium transparent glass bubble partially concealed at the top-center edge of the primary monitor that smoothly emerges and morphs into a sleek, translucent interaction capsule as the cursor approaches or hovers.
 
 ---
 
@@ -14,23 +14,22 @@ Nova Island is under active phased development.
   - Frameless, titlebar-less desktop window with native OS transparency support.
   - Pinned on top of ordinary desktop windows (`alwaysOnTop`).
   - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`, centered horizontally).
-  - Click-through transparency: Window regions outside the droplet use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
-- **Phase 2: Physically Inspired Water Droplet + Detachment Animation**
-  - **Phase A (Attached Pendant Droplet)**: Modeled after physical pendant drop fluid mechanics—narrow attachment neck at the horizontal screen bezel transitioning into a ballooning circular water bulb (eliminating cone or tapered glass geometries).
-  - **Phase B (Detachment Sequence)**: Upon full approach/hover, the neck smoothly pinches off, creating a visible 7px air gap separating the droplet from the screen bezel as it settles into a compact, translucent smoked-glass capsule.
-  - **Reattachment & Return**: When the cursor departs, the capsule glides upward, reconnects to the bezel, reforms the liquid neck, and retracts back into the resting contact bead.
-  - **Ultra-High Translucency**: Desktop wallpaper, text, and active windows remain visible through the water drop body and detached capsule.
-  - **Optical Properties**: Clipped backdrop refraction blur, continuous silvery curved meniscus edge highlights, and neutral grayscale gradients (strictly free of blue, cyan, or artificial glows).
-  - **Zero Indicator Artifacts**: 100% clean and natural—no glowing LEDs, indicator dots, or decorative lines.
+  - Click-through transparency: Window regions outside the bubble/capsule use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
+- **Phase 2: Premium Transparent Glass Bubble + Motion Graphics**
+  - **New Visual Identity**: Smooth, spherical glass bubble with subtle optical depth, replacing the previous water droplet concept.
+  - **Continuous Morphing Animation**: A single continuous glass element that widens and morphs from a hanging spherical bubble into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
+  - **Translucent Smoky Glass**: Refined neutral backdrop blur (`blur(16px) saturate(140%) contrast(106%)`) and delicate smoky gradients ensuring desktop wallpapers, text, and active windows remain visible through the glass.
+  - **Curved Specular Sheen**: Dynamic overhead light reflection that smoothly reshapes in tandem with the glass body.
+  - **Zero Indicator Artifacts**: 100% clean and minimal—strictly free of blue/cyan dots, green LEDs, or artificial glowing indicators.
 - **Phase 3: Native Cursor Proximity Detection**
   - Low-overhead Win32 `GetCursorPos` polling thread (30ms interval, 0.0% CPU overhead, no global hook).
   - High-DPI physical-to-logical coordinate translation relative to the primary display.
-  - Elliptical interaction halo matching the natural proportions of the droplet.
+  - Elliptical interaction halo matching the natural proportions of the island.
   - Progressive 4-stage proximity state machine:
-    - **Idle** ($> 240\text{ px}$): Tiny $8 \times 4.5\text{ px}$ transparent dewdrop resting at the top bezel.
-    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Extends downward ($10\text{px}$ neck, $26\text{px}$ round bulb, $19\text{px}$ height).
-    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Attached-stretched pendant drop ($7\text{px}$ waist, $44\text{px}$ plump bulb, $35\text{px}$ height) right before pinch-off.
-    - **Hovered** ($d \le 45\text{ px}$ or cursor inside capsule): Detaches with visible $7\text{px}$ gap and settles into the $136 \times 32\text{px}$ translucent smoked-glass interaction capsule.
+    - **Idle** ($> 240\text{ px}$): Compact $32 \times 32\text{ px}$ bubble tucked behind the top bezel (`translateY(-24px)`), with only the bottom ~8px curved glass rim visible.
+    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Smoothly emerges downward ($38 \times 38\text{ px}$, `translateY(-8px)`), revealing its round spherical glass dome.
+    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Fully emerged softly oval bubble ($44 \times 40\text{ px}$, `translateY(-2px)`), anticipating activation.
+    - **Hovered / Activated** ($d \le 45\text{ px}$ or cursor inside capsule): Morphs continuously into a sleek $148 \times 34\text{ px}$ horizontal smoked-glass capsule settling 4px below bezel with subtle overshoot.
   - Built-in 200ms anti-flicker hysteresis cooldown on exit transitions.
   - Strict zero focus stealing: The background proximity engine reads global coordinates without ever activating or stealing focus from active windows.
   - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.

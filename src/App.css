@@ -36,226 +36,208 @@ html, body, #root {
 
 /* 
   =============================================================================
-  PHASE A: Attached Pendant Droplet
-  - Physically accurate pendant drop hanging from the horizontal screen bezel
-  - Narrow stem/neck at attachment point -> ballooning circular bulb below
-  - Fluid stretching under surface tension
+  Nova Island — Premium Transparent Glass Bubble + Motion Graphics
+  - Single continuous morphing element: rounded glass bubble -> horizontal capsule
+  - Polished motion graphics with controlled scale, position, and subtle overshoot
+  - Translucent smoky glass: desktop content remains clearly visible through it
+  - Strictly zero dots, zero LEDs, zero blue/cyan/green indicators
   =============================================================================
 */
-.attached-droplet-container {
-  position: absolute;
-  top: 0;
-  width: 120px;
-  height: 48px;
-  pointer-events: none;
-  transition:
-    opacity 0.32s ease,
-    transform 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.05),
-    filter 0.42s cubic-bezier(0.2, 0.9, 0.25, 1.05);
-}
-
-/* Soft, natural drop shadow following the exact pendant geometry */
-.attached-droplet-container.state-idle {
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.12));
-}
-
-.attached-droplet-container.state-approaching {
-  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.16));
-}
-
-.attached-droplet-container.state-near {
-  filter: drop-shadow(0 5px 10px rgba(0, 0, 0, 0.20)) drop-shadow(0 1px 3px rgba(0, 0, 0, 0.10));
-}
-
-/* Smooth neck pinch-off and detachment transition */
-.attached-droplet-container.detaching-out {
-  opacity: 0;
-  transform: translateY(7px) scale(0.92);
-  pointer-events: none !important;
-}
-
-/* Optical blur clipped strictly to the pendant drop contour */
-.droplet-backdrop {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 120px;
-  height: 48px;
-  backdrop-filter: blur(8px) saturate(130%) contrast(105%) brightness(102%);
-  -webkit-backdrop-filter: blur(8px) saturate(130%) contrast(105%) brightness(102%);
-  clip-path: url(#attached-drop-clip);
-  pointer-events: none;
-}
-
-/* SVG Pendant Droplet Layer */
-.water-droplet-svg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 120px;
-  height: 48px;
-  overflow: visible;
-  pointer-events: none;
-}
-
-/* Droplet body and highlights */
-.droplet-body {
-  pointer-events: auto; /* Only the droplet body intercepts clicks */
-  cursor: pointer;
-  transition:
-    d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
-    opacity 0.45s ease;
-}
-
-.droplet-clip-path {
-  transition: d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05);
-}
-
-.droplet-meniscus {
-  pointer-events: none;
-  transition:
-    d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
-    opacity 0.45s ease;
-}
-
-.droplet-bottom-rim {
-  pointer-events: none;
-  transition:
-    d 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05),
-    opacity 0.45s ease;
-}
-
-/* 
-  State 0: Idle (Nearly invisible contact dewdrop at top bezel)
-*/
-.state-idle .droplet-body,
-.state-idle .droplet-clip-path {
-  d: path("M 56,0 C 56,1.5 56.5,3 57.5,4 C 58.5,4.8 61.5,4.8 62.5,4 C 63.5,3 64,1.5 64,0 Z");
-  opacity: 0.85;
-}
-
-.state-idle .droplet-meniscus {
-  d: path("M 57,1 C 57.5,2 58.5,3 60,3.2");
-  opacity: 0.60;
-}
-
-.state-idle .droplet-bottom-rim {
-  d: path("M 58,4 C 59.5,4.6 60.5,4.6 62,4");
-  opacity: 0.45;
-}
-
-/* 
-  State 1: Approaching (Draws downward: narrow 10px neck, 26px round bulb)
-*/
-.state-approaching .droplet-body,
-.state-approaching .droplet-clip-path {
-  d: path("M 55,0 C 55,2.5 54.5,5 54,7 C 53,10 47,12.5 47,15.5 C 47,18 53,19.5 60,19.5 C 67,19.5 73,18 73,15.5 C 73,12.5 67,10 66,7 C 65.5,5 65,2.5 65,0 Z");
-  opacity: 0.92;
-}
-
-.state-approaching .droplet-meniscus {
-  d: path("M 54.5,6 C 53,9.5 48.5,12 48,15");
-  opacity: 0.80;
-}
-
-.state-approaching .droplet-bottom-rim {
-  d: path("M 52,18 C 56,19.5 64,19.5 68,18");
-  opacity: 0.60;
-}
-
-/* 
-  State 2: Near (Attached-Stretched: narrow 7px waist, 44px plump bulb, ready to pinch off)
-*/
-.state-near .droplet-body,
-.state-near .droplet-clip-path {
-  d: path("M 56,0 C 56,3 56.5,6 56.5,9 C 56.5,14 38,18 38,25 C 38,31 47,35 60,35 C 73,35 82,31 82,25 C 82,18 63.5,14 63.5,9 C 63.5,6 64,3 64,0 Z");
-  opacity: 1;
-}
-
-.state-near .droplet-meniscus {
-  d: path("M 56,8 C 54,14 41,19 40,25 C 40,28 42,31 45,33");
-  opacity: 0.90;
-}
-
-.state-near .droplet-bottom-rim {
-  d: path("M 46,33 C 53,35 67,35 74,33");
-  opacity: 0.70;
-}
-
-/* 
-  =============================================================================
-  PHASE B: Detached Interaction Capsule
-  - Visibly separated from the top screen edge by a crisp 7px air gap
-  - Translucent smoked-glass capsule geometry
-  - Stable, intentional, compact panel for interaction
-  =============================================================================
-*/
-.detached-capsule-container {
-  position: absolute;
-  top: 7px; /* 7px air gap separating the capsule from the screen bezel */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(-8px) scale(0.92);
-  transition:
-    opacity 0.35s ease,
-    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.detached-capsule-container.visible {
-  opacity: 1;
-  transform: translateY(0) scale(1);
-  pointer-events: auto;
-}
-
-.detached-capsule {
+.glass-bubble {
   position: relative;
-  width: 136px;
-  height: 32px;
-  border-radius: 16px;
-  overflow: hidden;
+  margin: 0 auto;
+  pointer-events: auto; /* Only the bubble intercepts mouse events */
   cursor: pointer;
+  overflow: hidden;
 
-  /* Translucent smoked glass: darker than water droplet, but desktop remains visible */
-  background: linear-gradient(
-    180deg,
-    rgba(30, 34, 42, 0.76) 0%,
-    rgba(14, 16, 22, 0.88) 100%
-  );
+  /* Optical glass clarity: refined backdrop refraction without fogginess */
+  backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
 
-  backdrop-filter: blur(16px) saturate(145%) contrast(108%);
-  -webkit-backdrop-filter: blur(16px) saturate(145%) contrast(108%);
+  /* Delicate white hairline border reflection */
+  border: 1px solid rgba(255, 255, 255, 0.18);
 
-  /* Delicate hairline edge highlight */
-  border: 1px solid rgba(255, 255, 255, 0.16);
-
-  /* Inner specular reflection + soft ambient grounding shadow */
-  box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.25),
-    0 6px 18px -2px rgba(0, 0, 0, 0.32),
-    0 2px 5px rgba(0, 0, 0, 0.18);
-
+  /* Polished motion-graphics transition with controlled settle */
   transition:
-    background 0.35s ease,
-    box-shadow 0.35s ease,
-    border-color 0.35s ease;
+    width 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    height 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    border-radius 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    transform 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    background 0.38s ease,
+    box-shadow 0.38s ease,
+    border-color 0.38s ease;
+  will-change: width, height, border-radius, transform, background, box-shadow;
 }
 
-/* Subtle curved specular sheen along top of detached capsule */
-.capsule-sheen {
+/* Subtle curved specular sheen on top curve of the glass */
+.glass-specular {
   position: absolute;
   top: 1px;
   left: 10%;
   right: 10%;
-  height: 45%;
-  border-radius: 14px 14px 0 0;
+  height: 48%;
+  border-radius: 50% 50% 40% 40% / 100% 100% 30% 30%;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.20) 0%,
-    rgba(255, 255, 255, 0.03) 60%,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.05) 55%,
     transparent 100%
   );
   pointer-events: none;
+  opacity: 0.75;
+  transition:
+    opacity 0.38s ease,
+    left 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    right 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    height 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    border-radius 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05);
+}
+
+/* 
+  -----------------------------------------------------------------------------
+  State 0: Idle
+  - Bubble is almost entirely hidden behind the screen top edge
+  - Only a tiny curved glass rim (~8px) is visible resting at the top bezel
+  - Translucent smoky glass, no dots or colored indicators
+  -----------------------------------------------------------------------------
+*/
+.glass-bubble.state-idle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  transform: translateY(-24px);
+
+  /* Transparent thin glass tint */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.15) 0%,
+    rgba(255, 255, 255, 0.04) 35%,
+    rgba(18, 22, 30, 0.18) 75%,
+    rgba(10, 14, 20, 0.28) 100%
+  );
+
+  border-color: rgba(255, 255, 255, 0.16);
+
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.15),
+    0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.glass-bubble.state-idle .glass-specular {
+  opacity: 0.65;
+  left: 12%;
+  right: 12%;
+  height: 45%;
+}
+
+/* 
+  -----------------------------------------------------------------------------
+  State 1: Approaching
+  - Bubble smoothly emerges downward from the bezel
+  - Scales up slightly to 38px, showing its rounded spherical glass dome
+  - Fluid motion graphics with intentional, controlled positioning
+  -----------------------------------------------------------------------------
+*/
+.glass-bubble.state-approaching {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  transform: translateY(-8px);
+
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(18, 22, 30, 0.20) 75%,
+    rgba(10, 14, 20, 0.30) 100%
+  );
+
+  border-color: rgba(255, 255, 255, 0.18);
+
+  box-shadow:
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.35),
+    inset 0 -1px 2px rgba(255, 255, 255, 0.16),
+    0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+.glass-bubble.state-approaching .glass-specular {
+  opacity: 0.78;
+  left: 10%;
+  right: 10%;
+  height: 48%;
+}
+
+/* 
+  -----------------------------------------------------------------------------
+  State 2: Near (Anticipation / Full Bubble Reveal)
+  - Bubble fully emerges below the screen edge
+  - Softly oval shape (44x40px) as anticipation for horizontal expansion
+  -----------------------------------------------------------------------------
+*/
+.glass-bubble.state-near {
+  width: 44px;
+  height: 40px;
+  border-radius: 22px;
+  transform: translateY(-2px);
+
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.20) 0%,
+    rgba(255, 255, 255, 0.06) 35%,
+    rgba(18, 22, 30, 0.24) 75%,
+    rgba(10, 14, 20, 0.34) 100%
+  );
+
+  border-color: rgba(255, 255, 255, 0.20);
+
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.38),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.18),
+    0 5px 14px rgba(0, 0, 0, 0.26);
+}
+
+.glass-bubble.state-near .glass-specular {
+  opacity: 0.85;
+  left: 9%;
+  right: 9%;
+  height: 48%;
+}
+
+/* 
+  -----------------------------------------------------------------------------
+  State 3: Fully Activated (Hovered)
+  - Continuous morph: bubble smoothly widens horizontally into a sleek capsule
+  - Settles 4px below the bezel with a gentle, controlled overshoot
+  - Slightly darker smoked glass, but desktop remains clearly visible through it
+  - Smooth 17px rounded ends, zero dots or LEDs
+  -----------------------------------------------------------------------------
+*/
+.glass-bubble.state-hovered {
+  width: 148px;
+  height: 34px;
+  border-radius: 17px;
+  transform: translateY(4px);
+
+  /* Translucent smoked glass: darker than idle bubble, but clearly see-through */
+  background: linear-gradient(
+    180deg,
+    rgba(34, 38, 48, 0.72) 0%,
+    rgba(18, 20, 26, 0.84) 100%
+  );
+
+  border-color: rgba(255, 255, 255, 0.20);
+
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.28),
+    0 8px 20px -3px rgba(0, 0, 0, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.20);
+}
+
+.glass-bubble.state-hovered .glass-specular {
+  opacity: 0.88;
+  left: 8%;
+  right: 8%;
+  height: 46%;
+  border-radius: 14px 14px 0 0;
 }
