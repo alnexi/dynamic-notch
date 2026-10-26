@@ -87,6 +87,7 @@ function App() {
         data-proximity-level={effectiveState}
       >
         <div className="droplet-glint" />
+        <div className="droplet-glint-sub" />
         <div className="droplet-caustic" />
       </div>
     </div>

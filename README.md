@@ -21,16 +21,16 @@ Nova Island is under active phased development.
   - Realistic water optical properties: subtle refraction blur, delicate silvery edge meniscus highlights, specular overhead glint, and internal caustic refraction pool.
   - Restrained, natural soft caustic shadow grounding the droplet without dark smudges.
   - 100% clean and natural: Free from artificial glowing dots, indicator LEDs, or decorative lines.
-  - Fluid, liquid-surface-tension morphing driven by a tailored organic easing curve (`cubic-bezier(0.18, 0.9, 0.26, 1)`).
+  - Fluid, liquid-surface-tension morphing driven by a tailored organic easing curve (`cubic-bezier(0.2, 0.9, 0.25, 1.05)`).
 - **Phase 3: Native Cursor Proximity Detection**
   - Low-overhead Win32 `GetCursorPos` polling thread (30ms interval, 0.0% CPU overhead, no global hook).
   - High-DPI physical-to-logical coordinate translation relative to the primary display.
-  - Elliptical interaction halo matching the horizontal proportions of the droplet.
+  - Elliptical interaction halo matching the natural proportions of the droplet.
   - Progressive 4-stage proximity state machine:
-    - **Idle** ($> 240\text{ px}$): Compact $32 \times 14\text{ px}$ transparent dewdrop resting at the top bezel.
-    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Swells and emerges downward to $52 \times 21\text{ px}$.
-    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Deepens into a heavier teardrop ($96 \times 30\text{ px}$) with focused caustic light.
-    - **Hovered** ($d \le 45\text{ px}$ or cursor directly over droplet): Fully emerges into a lush, organic $156 \times 39\text{ px}$ water droplet.
+    - **Idle** ($> 240\text{ px}$): Compact $24 \times 10\text{ px}$ transparent dewdrop resting at the top bezel.
+    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Swells and emerges downward to $38 \times 20\text{ px}$.
+    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Deepens into a heavier teardrop ($56 \times 32\text{ px}$) with focused caustic light.
+    - **Hovered** ($d \le 45\text{ px}$ or cursor directly over droplet): Fully emerges into a lush, organic $78 \times 43\text{ px}$ water droplet.
   - Built-in 200ms anti-flicker hysteresis cooldown on exit transitions.
   - Strict zero focus stealing: The background proximity engine reads global coordinates without ever activating or stealing focus from active windows.
   - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
