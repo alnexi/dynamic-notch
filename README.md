@@ -16,11 +16,11 @@ Nova Island is under active phased development.
   - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`, centered horizontally).
   - Click-through transparency: Window regions outside the droplet use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
 - **Phase 2: Realistic Transparent Water Droplet UI**
-  - Organic, smooth water droplet silhouette emerging naturally from the top bezel of the monitor.
+  - Organic, smooth SVG water droplet silhouette emerging naturally from the top bezel of the monitor (narrow attachment neck flaring into a bulbous teardrop, completely replacing conventional capsule geometry).
   - Ultra-high translucency: Underneath desktop content, wallpapers, and application windows remain visible through the droplet body.
-  - Realistic water optical properties: subtle refraction blur, delicate silvery edge meniscus highlights, specular overhead glint, and internal caustic refraction pool.
-  - Restrained, natural soft caustic shadow grounding the droplet without dark smudges.
-  - 100% clean and natural: Free from artificial glowing dots, indicator LEDs, or decorative lines.
+  - Realistic water optical properties: clipped backdrop refraction blur, continuous silvery curved meniscus edge highlights, and neutral grayscale gradients (strictly free of blue, cyan, or artificial glows).
+  - Restrained, natural soft drop shadow hugging the organic droplet contour without dark smudges.
+  - 100% clean and natural: Completely eliminated all blue/cyan ovals, glowing dots, indicator LEDs, or decorative lines.
   - Fluid, liquid-surface-tension morphing driven by a tailored organic easing curve (`cubic-bezier(0.2, 0.9, 0.25, 1.05)`).
 - **Phase 3: Native Cursor Proximity Detection**
   - Low-overhead Win32 `GetCursorPos` polling thread (30ms interval, 0.0% CPU overhead, no global hook).
