@@ -1,0 +1,347 @@
+/* Reset and transparent canvas for frameless desktop overlay */
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color-scheme: dark;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent !important;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none; /* Let non-island canvas ignore mouse events */
+}
+
+/* Island container anchored directly to the top center of the window */
+.island-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  background: transparent;
+  pointer-events: none;
+}
+
+/* 
+  Nova Island Glass Droplet
+  Stage 0: Default Idle Appearance
+  - Small, subtle, smoked-glass droplet hanging from top edge
+  - High realism: layered dark tones, Fresnel reflections, subtle transparency, restrained shadow
+*/
+.island-droplet {
+  position: relative;
+  width: 38px;
+  height: 16px;
+  margin: 0 auto;
+  border-radius: 0 0 16px 16px;
+  pointer-events: auto; /* Only the droplet intercepts clicks & hover */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+
+  /* Layered translucent smoked glass: darker base, subtle top luminescence */
+  background: linear-gradient(
+    180deg,
+    rgba(38, 42, 50, 0.42) 0%,
+    rgba(18, 20, 26, 0.62) 60%,
+    rgba(8, 9, 12, 0.75) 100%
+  );
+
+  /* Optical glass diffusion & ambient refraction */
+  backdrop-filter: blur(20px) saturate(160%) contrast(108%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%) contrast(108%);
+
+  /* Delicate glass edge refraction & meniscus outline */
+  border-top: none;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
+
+  /* Multi-layered glass depth: top rim reflection + caustic shadow */
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 1.5px rgba(0, 0, 0, 0.6),
+    0 4px 14px -2px rgba(0, 0, 0, 0.45),
+    0 1px 3px rgba(0, 0, 0, 0.3);
+
+  /* Fluid, organic liquid-glass morphing curve */
+  transition:
+    width 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    height 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: width, height, border-radius, background, box-shadow;
+}
+
+/* Glass Specular Reflection Highlight (curved Fresnel sheen) */
+.droplet-specular {
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 55%;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  pointer-events: none;
+  opacity: 0.65;
+  transition:
+    opacity 0.38s ease,
+    height 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    left 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    right 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Subtle central status optic nestled within the glass */
+.droplet-optic {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.38s ease;
+}
+
+/* Micro-lens socket */
+.optic-lens {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 35% 35%,
+    rgba(45, 50, 60, 0.8) 0%,
+    rgba(12, 14, 18, 0.95) 100%
+  );
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  box-shadow:
+    inset 0 1px 1px rgba(0, 0, 0, 0.8),
+    0 1px 1px rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.optic-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow:
+    0 0 6px rgba(16, 185, 129, 0.75),
+    inset 0 0 1.5px rgba(255, 255, 255, 0.8);
+  opacity: 0.85;
+  transition: all 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Subtle interior fluting lines */
+.optic-flute {
+  height: 1px;
+  width: 0;
+  opacity: 0;
+  margin: 0;
+  transition:
+    width 0.38s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.38s ease,
+    margin 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flute-left {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35));
+}
+
+.flute-right {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), transparent);
+}
+
+/* 
+  Phase 3 Proximity Stage 1: Approaching
+  - Cursor enters broad top-center region (< 240 logical px)
+  - Droplet gently awakens and widens slightly (38px -> 56px, 16px -> 19px)
+  - Subtle luminescence and soft ambient presence
+*/
+.island-droplet.proximity-approaching {
+  width: 56px;
+  height: 19px;
+  border-radius: 0 0 18px 18px;
+
+  background: linear-gradient(
+    180deg,
+    rgba(34, 38, 48, 0.52) 0%,
+    rgba(16, 18, 24, 0.70) 60%,
+    rgba(8, 9, 13, 0.82) 100%
+  );
+
+  backdrop-filter: blur(22px) saturate(165%) contrast(109%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%) contrast(109%);
+
+  border-left: 1px solid rgba(255, 255, 255, 0.13);
+  border-right: 1px solid rgba(255, 255, 255, 0.13);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.19);
+
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.24),
+    inset 0 -1px 1.5px rgba(0, 0, 0, 0.6),
+    0 5px 16px -2px rgba(0, 0, 0, 0.5),
+    0 1px 4px rgba(0, 0, 0, 0.35),
+    0 0 12px rgba(255, 255, 255, 0.03);
+}
+
+.island-droplet.proximity-approaching .droplet-specular {
+  opacity: 0.72;
+  left: 8%;
+  right: 8%;
+  height: 54%;
+}
+
+.island-droplet.proximity-approaching .optic-dot {
+  box-shadow:
+    0 0 7px rgba(16, 185, 129, 0.85),
+    inset 0 0 1.5px rgba(255, 255, 255, 0.85);
+}
+
+/* 
+  Phase 3 Proximity Stage 2: Near
+  - Cursor is close to the island (< 120 logical px)
+  - Droplet increases reveal and size (56px -> 100px, 19px -> 25px)
+  - Fluting lines faintly emerge, backdrop deepens
+*/
+.island-droplet.proximity-near {
+  width: 100px;
+  height: 25px;
+  border-radius: 0 0 18px 18px;
+
+  background: linear-gradient(
+    180deg,
+    rgba(30, 34, 42, 0.70) 0%,
+    rgba(14, 16, 21, 0.84) 58%,
+    rgba(6, 7, 10, 0.90) 100%
+  );
+
+  backdrop-filter: blur(25px) saturate(170%) contrast(110%);
+  -webkit-backdrop-filter: blur(25px) saturate(170%) contrast(110%);
+
+  border-left: 1px solid rgba(255, 255, 255, 0.14);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.20);
+
+  box-shadow:
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.26),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.65),
+    0 6px 18px -3px rgba(0, 0, 0, 0.58),
+    0 2px 5px rgba(0, 0, 0, 0.38);
+}
+
+.island-droplet.proximity-near .droplet-specular {
+  opacity: 0.78;
+  left: 7%;
+  right: 7%;
+  height: 52%;
+}
+
+.island-droplet.proximity-near .optic-lens {
+  width: 10px;
+  height: 10px;
+}
+
+.island-droplet.proximity-near .optic-dot {
+  width: 4.5px;
+  height: 4.5px;
+  box-shadow:
+    0 0 8px rgba(16, 185, 129, 0.9),
+    inset 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.island-droplet.proximity-near .optic-flute {
+  width: 12px;
+  opacity: 0.22;
+  margin: 0 6px;
+}
+
+/* 
+  Phase 3 Proximity Stage 3 / Hovered State:
+  - Cursor reaches the island (< 45 logical px or pointer directly over window)
+  - Fully transforms into wider, dark, glossy capsule (216 × 40 px)
+*/
+.island-droplet:hover,
+.island-droplet.expanded,
+.island-droplet.proximity-hovered {
+  width: 216px;
+  height: 40px;
+  border-radius: 0 0 20px 20px;
+
+  /* Deep, lustrous obsidian smoked glass */
+  background: linear-gradient(
+    180deg,
+    rgba(28, 30, 36, 0.84) 0%,
+    rgba(14, 15, 19, 0.93) 55%,
+    rgba(5, 6, 8, 0.97) 100%
+  );
+
+  backdrop-filter: blur(28px) saturate(180%) contrast(112%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) contrast(112%);
+
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.28),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.7),
+    0 8px 24px -4px rgba(0, 0, 0, 0.65),
+    0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.island-droplet:hover .droplet-specular,
+.island-droplet.expanded .droplet-specular,
+.island-droplet.proximity-hovered .droplet-specular {
+  opacity: 0.85;
+  left: 6%;
+  right: 6%;
+  height: 50%;
+}
+
+.island-droplet:hover .optic-lens,
+.island-droplet.expanded .optic-lens,
+.island-droplet.proximity-hovered .optic-lens {
+  width: 11px;
+  height: 11px;
+}
+
+.island-droplet:hover .optic-dot,
+.island-droplet.expanded .optic-dot,
+.island-droplet.proximity-hovered .optic-dot {
+  width: 5px;
+  height: 5px;
+  opacity: 1;
+  box-shadow:
+    0 0 8px rgba(16, 185, 129, 0.95),
+    inset 0 0 2px rgba(255, 255, 255, 0.9);
+}
+
+.island-droplet:hover .optic-flute,
+.island-droplet.expanded .optic-flute,
+.island-droplet.proximity-hovered .optic-flute {
+  width: 24px;
+  opacity: 0.3;
+  margin: 0 10px;
+}
