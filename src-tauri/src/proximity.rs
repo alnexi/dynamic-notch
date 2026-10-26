@@ -33,13 +33,15 @@ fn get_cursor_position() -> Option<(i32, i32)> {
     None
 }
 
-/// Proximity level representing the interaction state along the top edge.
+/// Progressive proximity level representing the interaction state along the top edge.
+/// Proximity alone NEVER opens the capsule; Hovered only triggers when physically entering the protrusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProximityLevel {
     Idle = 0,
     Approaching = 1,
-    Hovered = 2,
+    Near = 2,
+    Hovered = 3,
 }
 
 /// Event payload emitted to the frontend for tracking and activation.
@@ -53,11 +55,13 @@ pub struct ProximityPayload {
     pub is_locked: bool,
 }
 
-/// Configuration parameters for pointer tracking along the top edge.
+/// Configuration parameters for subtle pointer tracking along the top edge.
 pub struct ProximityConfig {
-    pub top_proximity_threshold: f32, // Logical px from top edge to trigger approaching
-    pub bubble_radius: f32,            // Logical px radius to detect entry
-    pub leave_threshold: f32,          // Logical px to auto-unlock if cursor leaves far away
+    pub top_proximity_threshold: f32, // Logical px from top edge for initial reveal (~90.0)
+    pub near_threshold: f32,          // Logical px from top edge for progressive closer reveal (~45.0)
+    pub entry_y_threshold: f32,       // Logical px max Y to detect entry into visible protrusion (~7.0)
+    pub entry_radius: f32,            // Logical px half-width of protrusion entry (~16.0)
+    pub leave_threshold: f32,         // Logical px to auto-unlock if cursor leaves capsule (~80.0)
     pub poll_interval: Duration,
     pub leave_delay: Duration,
 }
@@ -66,7 +70,9 @@ impl Default for ProximityConfig {
     fn default() -> Self {
         Self {
             top_proximity_threshold: 90.0,
-            bubble_radius: 24.0,
+            near_threshold: 45.0,
+            entry_y_threshold: 7.0,
+            entry_radius: 16.0,
             leave_threshold: 80.0,
             poll_interval: Duration::from_millis(20),
             leave_delay: Duration::from_millis(150),
@@ -83,6 +89,25 @@ pub fn compute_anchor_and_window(cursor_x: f32, monitor_width: f32) -> (f32, f32
     (anchor_x, win_x_logical, offset_x)
 }
 
+/// Determines the progressive proximity level.
+/// Crucial requirement: proximity alone NEVER opens the capsule. Hovered only triggers
+/// when the cursor physically enters the tiny 3-6px visible protrusion geometry.
+pub fn determine_proximity_level(
+    dy: f32,
+    dx_to_anchor: f32,
+    config: &ProximityConfig,
+) -> ProximityLevel {
+    if dy > config.top_proximity_threshold || dy < 0.0 {
+        ProximityLevel::Idle
+    } else if dy <= config.entry_y_threshold && dx_to_anchor.abs() <= config.entry_radius {
+        ProximityLevel::Hovered
+    } else if dy <= config.near_threshold {
+        ProximityLevel::Near
+    } else {
+        ProximityLevel::Approaching
+    }
+}
+
 /// Starts the lightweight background pointer-tracking and proximity detector.
 pub fn start_proximity_detector(
     window: WebviewWindow,
@@ -97,7 +122,7 @@ pub fn start_proximity_detector(
         let mut last_win_phys_x = -9999i32;
         let mut pending_downgrade: Option<(ProximityLevel, Instant)> = None;
 
-        println!("[NovaIsland] Pointer-anchored proximity detector thread started.");
+        println!("[NovaIsland] Subtle pointer-anchored proximity detector thread started.");
 
         while is_running.load(Ordering::Relaxed) {
             if let Ok(Some(monitor)) = window.primary_monitor() {
@@ -119,7 +144,11 @@ pub fn start_proximity_detector(
                         if rel_y > config.leave_threshold || dx > 120.0 || rel_y < -20.0 {
                             is_anchor_locked.store(false, Ordering::Relaxed);
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
-                                ProximityLevel::Approaching
+                                if rel_y <= config.near_threshold {
+                                    ProximityLevel::Near
+                                } else {
+                                    ProximityLevel::Approaching
+                                }
                             } else {
                                 ProximityLevel::Idle
                             };
@@ -188,13 +217,11 @@ pub fn start_proximity_detector(
                                 ));
                             }
 
-                            // Check if cursor entered the visible bubble (activation trigger)
-                            let in_bubble = dy <= 32.0 && (rel_x - anchor_x).abs() <= config.bubble_radius;
-                            let raw_level = if in_bubble {
-                                ProximityLevel::Hovered
-                            } else {
-                                ProximityLevel::Approaching
-                            };
+                            // Progressive reveal level based on distance to top edge:
+                            // Proximity alone NEVER opens the capsule!
+                            // Only physical entry into the 3-6px visible protrusion triggers Hovered.
+                            let dx_to_anchor = rel_x - anchor_x;
+                            let raw_level = determine_proximity_level(dy, dx_to_anchor, &config);
 
                             if raw_level == ProximityLevel::Hovered {
                                 is_anchor_locked.store(true, Ordering::Relaxed);
@@ -221,7 +248,7 @@ pub fn start_proximity_detector(
             thread::sleep(config.poll_interval);
         }
 
-        println!("[NovaIsland] Pointer-anchored proximity detector thread terminated.");
+        println!("[NovaIsland] Subtle pointer-anchored proximity detector thread terminated.");
     });
 }
 
@@ -270,5 +297,61 @@ mod tests {
         assert_eq!(win_x, 1680.0);
         assert_eq!(offset_x, 162.0);
         assert_eq!(win_x + offset_x, 1842.0);
+    }
+
+    #[test]
+    fn test_progressive_reveal_levels_and_no_proximity_opening() {
+        let config = ProximityConfig::default();
+
+        // 1. Far from top edge (> 90px): Idle (completely invisible)
+        assert_eq!(
+            determine_proximity_level(150.0, 0.0, &config),
+            ProximityLevel::Idle
+        );
+        assert_eq!(
+            determine_proximity_level(95.0, 0.0, &config),
+            ProximityLevel::Idle
+        );
+
+        // 2. Approaching top edge (45px < dy <= 90px): Approaching (subtle ~3.5px curved edge)
+        assert_eq!(
+            determine_proximity_level(80.0, 0.0, &config),
+            ProximityLevel::Approaching
+        );
+        assert_eq!(
+            determine_proximity_level(50.0, 0.0, &config),
+            ProximityLevel::Approaching
+        );
+
+        // 3. Moving closer (7px < dy <= 45px): Near (subtle ~5.5px curved edge)
+        // Crucial: Proximity alone must NEVER open the capsule!
+        assert_eq!(
+            determine_proximity_level(40.0, 0.0, &config),
+            ProximityLevel::Near
+        );
+        assert_eq!(
+            determine_proximity_level(20.0, 0.0, &config),
+            ProximityLevel::Near
+        );
+        assert_eq!(
+            determine_proximity_level(8.0, 0.0, &config),
+            ProximityLevel::Near
+        );
+
+        // 4. Cursor entering the visible 3-6px protrusion (dy <= 7px and |dx| <= 16px): Hovered (capsule opens)
+        assert_eq!(
+            determine_proximity_level(5.0, 2.0, &config),
+            ProximityLevel::Hovered
+        );
+        assert_eq!(
+            determine_proximity_level(2.0, 15.0, &config),
+            ProximityLevel::Hovered
+        );
+
+        // 5. Cursor near top edge (dy <= 7px) but laterally outside protrusion: Still Near, NOT Hovered
+        assert_eq!(
+            determine_proximity_level(5.0, 40.0, &config),
+            ProximityLevel::Near
+        );
     }
 }

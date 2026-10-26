@@ -33,12 +33,13 @@ html, body, #root {
 
 /* 
   =============================================================================
-  Nova Island — Pointer-Anchored Transparent Glass Bubble & Capsule
+  Nova Island — Subtle Pointer-Anchored Curved Protrusion & Capsule
   - Tracks pointer horizontal position across the entire top edge of the monitor
-  - Idle state: completely invisible (opacity: 0, pointer-events: none)
-  - Approaching: emerges at current pointer X coordinate along top edge
-  - Activation: freezes anchor X and expands capsule horizontally right at cursor
-  - Deactivation: pressing Escape, clicking outside, or leaving smoothly collapses
+  - Idle: completely invisible (opacity: 0, pointer-events: none)
+  - Approaching: tiny 3-4px curved edge appears at pointer's X coordinate
+  - Near: compact 5.5px curved edge (proximity alone NEVER opens the capsule)
+  - Activation: entering protrusion freezes anchor X and expands into full capsule
+  - Deactivation: pressing Escape, moving away, or clicking outside collapses
   - Strictly preserves 100% transparent glass material across every state
   - Zero dots, zero LEDs, zero dark/opaque fills
   =============================================================================
@@ -49,12 +50,12 @@ html, body, #root {
   left: var(--bubble-offset, 120px);
   pointer-events: auto; /* Intercepts mouse events when active/visible */
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
   transform-origin: center top;
 
   /* 
     Consistent transparent glass material across EVERY state:
-    Preserves light smoky transparency in idle, approaching, and expanded capsule states.
+    Preserves light smoky transparency in idle, approaching, near, and capsule states.
     Never darkens or becomes opaque.
   */
   background: linear-gradient(
@@ -69,14 +70,15 @@ html, body, #root {
   backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
   -webkit-backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
 
-  /* Delicate white hairline border reflection */
-  border: 1px solid rgba(255, 255, 255, 0.18);
+  /* Delicate hairline border reflection attached flush to the top bezel */
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-top: none;
 
-  /* Inner glass meniscus highlight + soft restrained shadow */
+  /* Restrained, understated shadow with zero artificial glow */
   box-shadow:
-    inset 0 1px 1.2px rgba(255, 255, 255, 0.32),
-    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
-    0 4px 14px rgba(0, 0, 0, 0.18);
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 1.2px rgba(255, 255, 255, 0.10),
+    0 3px 10px rgba(0, 0, 0, 0.16);
 
   /* Polished motion-graphics transition with spring-like settle */
   transition:
@@ -84,10 +86,29 @@ html, body, #root {
     height 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     border-radius 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     transform 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    opacity 0.25s ease,
-    box-shadow 0.32s ease,
-    border-color 0.32s ease;
+    opacity 0.22s ease,
+    border-color 0.32s ease,
+    box-shadow 0.32s ease;
   will-change: width, height, border-radius, transform, opacity, box-shadow;
+}
+
+/* 
+  Reliable hover capture zone:
+  Extends slightly around the visible protrusion so it can be hovered cleanly
+  without flicker or pointer-chasing, while keeping idle state completely non-blocking.
+*/
+.glass-bubble::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  right: -4px;
+  bottom: -6px;
+  pointer-events: auto;
+}
+
+.glass-bubble.state-idle::before {
+  pointer-events: none;
 }
 
 /* Subtle curved specular sheen on top curve of the glass */
@@ -117,74 +138,96 @@ html, body, #root {
 /* 
   -----------------------------------------------------------------------------
   State 0: Idle
-  - Completely invisible when cursor is away from the top edge
-  - pointer-events: none guarantees total click-through everywhere
-  - Positioned slightly retracted above the top bezel
+  - Completely invisible when cursor is away from top edge
+  - Strictly pointer-events: none (zero input interception anywhere)
+  - Retracted cleanly above the top screen bezel
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-idle {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  transform: translateX(-50%) translateY(-36px);
+  width: 26px;
+  height: 14px;
+  border-radius: 0 0 13px 13px;
+  transform: translateX(-50%) translateY(-16px);
   opacity: 0;
   pointer-events: none;
-
-  border-color: rgba(255, 255, 255, 0.16);
-
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.30),
-    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
-    0 3px 8px rgba(0, 0, 0, 0.14);
 }
 
 .glass-bubble.state-idle .glass-specular {
   opacity: 0;
-  left: 12%;
-  right: 12%;
-  height: 45%;
 }
 
 /* 
   -----------------------------------------------------------------------------
-  State 1: Approaching (Pointer Tracking)
-  - Emerges smoothly at the pointer's horizontal position along the top edge
-  - Spherical bubble dome (38x38px) following cursor horizontally
-  - Full transparency, no dots or marks
+  State 1: Approaching (Extremely Subtle Initial Protrusion)
+  - Protrusion width: 28 CSS pixels (target: 24–32px)
+  - Visible height below top bezel: exactly 3.5 CSS pixels (target: 3–6px)
+  - Looks like a tiny curved edge emerging from the screen bezel
+  - Understated transparent glass, no glow, no dots, no bright borders
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-approaching {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  opacity: 1;
+  width: 28px;
+  height: 14px;
+  border-radius: 0 0 14px 14px;
+  transform: translateX(-50%) translateY(-10.5px); /* 14 - 10.5 = 3.5px visible height */
+  opacity: 0.95;
   pointer-events: auto;
 
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.14);
 
   box-shadow:
-    inset 0 1px 1.2px rgba(255, 255, 255, 0.32),
-    inset 0 -1px 1.8px rgba(255, 255, 255, 0.14),
-    0 4px 12px rgba(0, 0, 0, 0.18);
+    inset 0 1px 1px rgba(255, 255, 255, 0.20),
+    0 2px 6px rgba(0, 0, 0, 0.14);
 }
 
 .glass-bubble.state-approaching .glass-specular {
-  opacity: 0.75;
-  left: 10%;
-  right: 10%;
-  height: 48%;
+  opacity: 0.50;
+  left: 12%;
+  right: 12%;
+  height: 40%;
 }
 
 /* 
   -----------------------------------------------------------------------------
-  State 2: Fully Activated (Hovered / Expanded Capsule)
-  - Anchor X is FROZEN at cursor entry position (does NOT jump to center)
-  - Capsule expands horizontally (148x34px) symmetrically around anchor X
-  - Settles 4px below the bezel with a gentle, controlled overshoot
-  - RETAINS FULL TRANSPARENCY: exactly the same base color, glass material,
-    and see-through clarity as the bubble. Never darkens or becomes opaque.
-  - Dismissed via Escape key, moving away, or clicking outside
+  State 2: Near (Progressive Closer Reveal)
+  - Cursor moves closer (dy <= 45px), but has NOT entered the protrusion
+  - Protrusion width: 30 CSS pixels (target: 24–32px)
+  - Visible height below top bezel: exactly 5.5 CSS pixels (target: 3–6px)
+  - Slightly more visible, but remains compact and understated
+  - Crucial: Proximity alone NEVER opens the capsule
+  -----------------------------------------------------------------------------
+*/
+.glass-bubble.state-near {
+  width: 30px;
+  height: 16px;
+  border-radius: 0 0 15px 15px;
+  transform: translateX(-50%) translateY(-10.5px); /* 16 - 10.5 = 5.5px visible height */
+  opacity: 1;
+  pointer-events: auto;
+
+  border-color: rgba(255, 255, 255, 0.16);
+
+  box-shadow:
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.24),
+    0 3px 8px rgba(0, 0, 0, 0.16);
+}
+
+.glass-bubble.state-near .glass-specular {
+  opacity: 0.65;
+  left: 10%;
+  right: 10%;
+  height: 44%;
+}
+
+/* 
+  -----------------------------------------------------------------------------
+  State 3: Fully Activated (Hovered / Expanded Capsule)
+  - Triggered ONLY when mouse physically enters the visible protrusion
+  - Anchor X is FROZEN at pointer location (does NOT jump to center)
+  - Expands smoothly into 148x34px horizontal capsule
+  - Settles 4px below the bezel with gentle overshoot
+  - RETAINS FULL TRANSPARENCY: identical see-through glass material, no darkening
+  - Dismissed on Escape, moving away, or clicking outside
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-hovered {
@@ -195,8 +238,7 @@ html, body, #root {
   opacity: 1;
   pointer-events: auto;
 
-  /* Delicate hairline highlight matching the bubble */
-  border-color: rgba(255, 255, 255, 0.20);
+  border: 1px solid rgba(255, 255, 255, 0.18);
 
   box-shadow:
     inset 0 1px 1.5px rgba(255, 255, 255, 0.32),

@@ -1,6 +1,6 @@
 # Nova Island
 
-Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass bubble that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
+Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
 ---
 
@@ -14,23 +14,27 @@ Nova Island is under active phased development.
   - Frameless, titlebar-less desktop window with native OS transparency support.
   - Pinned on top of ordinary desktop windows (`alwaysOnTop`).
   - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`).
-  - Click-through transparency: Window regions outside the bubble/capsule use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
-- **Phase 2: Premium Transparent Glass Bubble + Motion Graphics**
-  - **Visual Identity**: Smooth, spherical glass bubble with subtle optical depth and refined specular reflections.
-  - **Continuous Morphing Animation**: A single continuous glass element that widens and morphs from a hanging spherical bubble into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
+  - Click-through transparency: Window regions outside the visible interface use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
+- **Phase 2: Premium Transparent Glass Material + Motion Graphics**
+  - **Visual Identity**: Understated transparent glass aesthetic with subtle optical depth and refined specular reflections.
+  - **Continuous Morphing Animation**: A single continuous glass element that expands from a subtle curved protrusion into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
   - **Translucent Smoky Glass**: Refined neutral backdrop blur (`blur(16px) saturate(140%) contrast(106%)`) and consistent smoky glass transparency across every state, ensuring desktop wallpapers, text, and active windows remain visible through the glass at all times.
-  - **Preserved Full Transparency in Capsule**: The capsule never changes to a darker or opaque fill upon activation, preserving the exact same base color and see-through clarity as the bubble throughout the entire morph.
-  - **Curved Specular Sheen**: Dynamic overhead light reflection that smoothly reshapes in tandem with the glass body.
+  - **Preserved Full Transparency in Capsule**: The capsule never changes to a darker or opaque fill upon activation, preserving the exact same base color and see-through clarity throughout the entire morph.
   - **Zero Indicator Artifacts**: 100% clean and minimal—strictly free of blue/cyan dots, green LEDs, or artificial glowing indicators.
-- **Phase 3: Pointer-Anchored Tracking & Native Proximity**
-  - **Full Top-Edge Horizontal Tracking**: The bubble and capsule are anchored directly to the user's horizontal cursor position ($X$) along the entire top edge of the primary display rather than being locked to screen center:
-    - Approaching near the far left $\rightarrow$ bubble emerges near the left edge.
-    - Approaching near the center $\rightarrow$ bubble emerges at the center.
-    - Approaching near the far right $\rightarrow$ bubble emerges near the right edge.
+- **Phase 3: Pointer-Anchored Tracking & Subtle Progressive Reveal**
+  - **Full Top-Edge Horizontal Tracking**: The protrusion and capsule are anchored directly to the user's horizontal cursor position ($X$) along the entire top edge of the primary display rather than being locked to screen center:
+    - Approaching near the far left $\rightarrow$ protrusion emerges near the left edge.
+    - Approaching near the center $\rightarrow$ protrusion emerges at the center.
+    - Approaching near the far right $\rightarrow$ protrusion emerges near the right edge.
+  - **Extremely Subtle Initial Protrusion**:
+    - **Idle** ($dy > 90\text{ px}$): 100% invisible (`opacity: 0; pointer-events: none;`).
+    - **Approaching** ($45\text{ px} < dy \le 90\text{ px}$): Only a tiny curved edge emerges from the screen bezel ($28\text{ px}$ wide, visible height of approximately $3.5\text{ px}$). Understated transparent glass with no obvious glow or bright border.
+    - **Near** ($7\text{ px} < dy \le 45\text{ px}$): Protrusion becomes slightly more visible ($30\text{ px}$ wide, visible height of approximately $5.5\text{ px}$), but remains compact.
+    - **Strict Rule — Proximity Alone Never Opens Capsule**: The capsule only opens when the user physically moves the cursor into the visible protrusion geometry.
+  - **Hovered / Activated State**: Cursor entering the visible protrusion freezes anchor $X$ and smoothly expands into a $148 \times 34\text{ px}$ capsule right at the cursor's location.
   - **Edge Clamping**: Intelligent boundary clamping prevents the $148\text{ px}$ capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
-  - **Frozen Anchor on Activation**: When the cursor enters the bubble, the anchor coordinate freezes, and the capsule expands symmetrically right at the cursor's entry point without jumping to center or drifting during interaction.
+  - **Anti-Flicker & Interaction Reliability**: Generous hover capture zone on the protrusion prevents pointer-chasing and flickering while keeping the idle state fully non-blocking.
   - **Keyboard & Click-Outside Dismissal**: Pressing `Escape` or clicking outside immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
-  - **100% Invisible Idle State**: When the mouse is not near the top edge, the island is completely invisible with `pointer-events: none`, ensuring complete desktop click-through.
   - **Win32 Lifecycle Guard**: Native named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
 
 ### Planned Features (Future Phases)
@@ -93,7 +97,7 @@ npm.cmd run tauri dev
 ```
 
 ### 5. Run Rust Unit Tests
-Runs unit tests for pointer tracking math and monitor edge clamping:
+Runs unit tests for pointer tracking math, edge clamping, and progressive reveal levels:
 ```powershell
 cd src-tauri
 cargo test
@@ -126,7 +130,7 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 ├── public/                  # Static assets and icons
 ├── src/                     # React frontend
 │   ├── App.tsx              # Nova Island component, anchor tracking & key listener
-│   ├── App.css              # Transparent glass styling & motion graphics
+│   ├── App.css              # Subtle protrusion styling & motion graphics
 │   ├── main.tsx             # React DOM root entry point
 │   └── vite-env.d.ts        # Vite environment typings
 ├── src-tauri/               # Native Rust application layer
@@ -136,7 +140,7 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 │   ├── src/
 │   │   ├── main.rs          # Win32 lifecycle guard, mutex & entry point
 │   │   ├── lib.rs           # Window setup, anchor locking & Tauri run loop
-│   │   └── proximity.rs     # Win32 cursor tracking & edge clamping engine
+│   │   └── proximity.rs     # Win32 cursor tracking & progressive reveal engine
 │   ├── Cargo.toml           # Rust package configuration & dependencies
 │   ├── build.rs             # Tauri build script
 │   └── tauri.conf.json      # Window size, transparency & bundle config

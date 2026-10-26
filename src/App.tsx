@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import "./App.css";
 
-export type ProximityLevel = "idle" | "approaching" | "hovered";
+export type ProximityLevel = "idle" | "approaching" | "near" | "hovered";
 
 export interface ProximityPayload {
   level: ProximityLevel;
@@ -113,9 +113,11 @@ function App() {
     emitUnlock();
   };
 
-  // Direct activation takes highest precedence, then proximity states
+  // Direct activation takes highest precedence, then progressive proximity states
   const effectiveState: ProximityLevel = isActivated || proximity === "hovered"
     ? "hovered"
+    : proximity === "near"
+    ? "near"
     : proximity === "approaching"
     ? "approaching"
     : "idle";
@@ -127,18 +129,19 @@ function App() {
       style={{ "--bubble-offset": `${offsetX}px` } as React.CSSProperties}
     >
       {/* 
-        Pointer-Anchored Morphing Glass Bubble:
-        - When idle: completely invisible, letting all clicks pass straight through.
-        - When pointer approaches top edge: smoothly emerges at pointer's horizontal X position.
-        - When pointer enters bubble: freezes anchor X and expands into horizontal capsule right there.
-        - Fully transparent glass material preserved across every state.
+        Subtle Pointer-Anchored Protrusion & Capsule:
+        - Idle: completely invisible, zero input interception.
+        - Approaching: tiny 3-4px curved edge emerges at current pointer X coordinate.
+        - Near: compact 5.5px curved edge (proximity alone NEVER opens the capsule).
+        - Hovered: cursor enters protrusion -> freezes anchor X and expands into 148x34px capsule right at cursor.
+        - Full transparent glass appearance maintained across all states.
       */}
       <div
         className={`glass-bubble state-${effectiveState}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         data-tauri-drag-region
-        aria-label="Nova Island Glass Bubble"
+        aria-label="Nova Island Protrusion"
         data-proximity-level={effectiveState}
       >
         <div className="glass-specular" />
