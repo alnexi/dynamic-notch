@@ -38,9 +38,10 @@ html, body, #root {
   =============================================================================
   Nova Island — Premium Transparent Glass Bubble + Motion Graphics
   - Single continuous morphing element: rounded glass bubble -> horizontal capsule
+  - Consistent full transparency in every visual state (including expanded capsule)
+  - Desktop and wallpaper remain clearly visible through both bubble and capsule
   - Polished motion graphics with controlled scale, position, and subtle overshoot
-  - Translucent smoky glass: desktop content remains clearly visible through it
-  - Strictly zero dots, zero LEDs, zero blue/cyan/green indicators
+  - Strictly zero dots, zero LEDs, zero dark/opaque fills
   =============================================================================
 */
 .glass-bubble {
@@ -50,6 +51,19 @@ html, body, #root {
   cursor: pointer;
   overflow: hidden;
 
+  /* 
+    Consistent transparent glass material across EVERY state:
+    Preserves the exact same light smoky transparency in idle, approaching, near,
+    and expanded capsule states. Never darkens or becomes opaque.
+  */
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.04) 35%,
+    rgba(18, 22, 30, 0.18) 75%,
+    rgba(10, 14, 20, 0.26) 100%
+  );
+
   /* Optical glass clarity: refined backdrop refraction without fogginess */
   backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
   -webkit-backdrop-filter: blur(16px) saturate(140%) contrast(106%) brightness(102%);
@@ -57,16 +71,21 @@ html, body, #root {
   /* Delicate white hairline border reflection */
   border: 1px solid rgba(255, 255, 255, 0.18);
 
+  /* Inner glass meniscus highlight + soft restrained shadow */
+  box-shadow:
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
+    0 4px 14px rgba(0, 0, 0, 0.18);
+
   /* Polished motion-graphics transition with controlled settle */
   transition:
     width 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     height 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     border-radius 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     transform 0.42s cubic-bezier(0.2, 0.95, 0.3, 1.05),
-    background 0.38s ease,
     box-shadow 0.38s ease,
     border-color 0.38s ease;
-  will-change: width, height, border-radius, transform, background, box-shadow;
+  will-change: width, height, border-radius, transform, box-shadow;
 }
 
 /* Subtle curved specular sheen on top curve of the glass */
@@ -79,7 +98,7 @@ html, body, #root {
   border-radius: 50% 50% 40% 40% / 100% 100% 30% 30%;
   background: linear-gradient(
     180deg,
-    rgba(255, 255, 255, 0.28) 0%,
+    rgba(255, 255, 255, 0.26) 0%,
     rgba(255, 255, 255, 0.05) 55%,
     transparent 100%
   );
@@ -98,7 +117,7 @@ html, body, #root {
   State 0: Idle
   - Bubble is almost entirely hidden behind the screen top edge
   - Only a tiny curved glass rim (~8px) is visible resting at the top bezel
-  - Translucent smoky glass, no dots or colored indicators
+  - Same transparent glass material, no dark fills or dots
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-idle {
@@ -107,21 +126,12 @@ html, body, #root {
   border-radius: 50%;
   transform: translateY(-24px);
 
-  /* Transparent thin glass tint */
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.15) 0%,
-    rgba(255, 255, 255, 0.04) 35%,
-    rgba(18, 22, 30, 0.18) 75%,
-    rgba(10, 14, 20, 0.28) 100%
-  );
-
   border-color: rgba(255, 255, 255, 0.16);
 
   box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.32),
-    inset 0 -1px 1.5px rgba(255, 255, 255, 0.15),
-    0 3px 8px rgba(0, 0, 0, 0.16);
+    inset 0 1px 1px rgba(255, 255, 255, 0.30),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
+    0 3px 8px rgba(0, 0, 0, 0.14);
 }
 
 .glass-bubble.state-idle .glass-specular {
@@ -135,7 +145,7 @@ html, body, #root {
   -----------------------------------------------------------------------------
   State 1: Approaching
   - Bubble smoothly emerges downward from the bezel
-  - Scales up slightly to 38px, showing its rounded spherical glass dome
+  - Scales up slightly to 38px, revealing its rounded spherical glass dome
   - Fluid motion graphics with intentional, controlled positioning
   -----------------------------------------------------------------------------
 */
@@ -145,24 +155,16 @@ html, body, #root {
   border-radius: 50%;
   transform: translateY(-8px);
 
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.18) 0%,
-    rgba(255, 255, 255, 0.05) 35%,
-    rgba(18, 22, 30, 0.20) 75%,
-    rgba(10, 14, 20, 0.30) 100%
-  );
-
   border-color: rgba(255, 255, 255, 0.18);
 
   box-shadow:
-    inset 0 1px 1.2px rgba(255, 255, 255, 0.35),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.16),
-    0 4px 12px rgba(0, 0, 0, 0.22);
+    inset 0 1px 1.2px rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1.8px rgba(255, 255, 255, 0.14),
+    0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
 .glass-bubble.state-approaching .glass-specular {
-  opacity: 0.78;
+  opacity: 0.75;
   left: 10%;
   right: 10%;
   height: 48%;
@@ -181,24 +183,16 @@ html, body, #root {
   border-radius: 22px;
   transform: translateY(-2px);
 
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.20) 0%,
-    rgba(255, 255, 255, 0.06) 35%,
-    rgba(18, 22, 30, 0.24) 75%,
-    rgba(10, 14, 20, 0.34) 100%
-  );
-
   border-color: rgba(255, 255, 255, 0.20);
 
   box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.38),
-    inset 0 -1.5px 2px rgba(255, 255, 255, 0.18),
-    0 5px 14px rgba(0, 0, 0, 0.26);
+    inset 0 1px 1.4px rgba(255, 255, 255, 0.35),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.15),
+    0 5px 14px rgba(0, 0, 0, 0.20);
 }
 
 .glass-bubble.state-near .glass-specular {
-  opacity: 0.85;
+  opacity: 0.80;
   left: 9%;
   right: 9%;
   height: 48%;
@@ -209,7 +203,8 @@ html, body, #root {
   State 3: Fully Activated (Hovered)
   - Continuous morph: bubble smoothly widens horizontally into a sleek capsule
   - Settles 4px below the bezel with a gentle, controlled overshoot
-  - Slightly darker smoked glass, but desktop remains clearly visible through it
+  - RETAINS FULL TRANSPARENCY: exactly the same base color, glass material,
+    and see-through clarity as the bubble. Never darkens or becomes opaque.
   - Smooth 17px rounded ends, zero dots or LEDs
   -----------------------------------------------------------------------------
 */
@@ -219,23 +214,17 @@ html, body, #root {
   border-radius: 17px;
   transform: translateY(4px);
 
-  /* Translucent smoked glass: darker than idle bubble, but clearly see-through */
-  background: linear-gradient(
-    180deg,
-    rgba(34, 38, 48, 0.72) 0%,
-    rgba(18, 20, 26, 0.84) 100%
-  );
-
+  /* Delicate hairline highlight matching the bubble */
   border-color: rgba(255, 255, 255, 0.20);
 
   box-shadow:
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.28),
-    0 8px 20px -3px rgba(0, 0, 0, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.20);
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
+    0 5px 16px rgba(0, 0, 0, 0.20);
 }
 
 .glass-bubble.state-hovered .glass-specular {
-  opacity: 0.88;
+  opacity: 0.82;
   left: 8%;
   right: 8%;
   height: 46%;

@@ -18,7 +18,8 @@ Nova Island is under active phased development.
 - **Phase 2: Premium Transparent Glass Bubble + Motion Graphics**
   - **New Visual Identity**: Smooth, spherical glass bubble with subtle optical depth, replacing the previous water droplet concept.
   - **Continuous Morphing Animation**: A single continuous glass element that widens and morphs from a hanging spherical bubble into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
-  - **Translucent Smoky Glass**: Refined neutral backdrop blur (`blur(16px) saturate(140%) contrast(106%)`) and delicate smoky gradients ensuring desktop wallpapers, text, and active windows remain visible through the glass.
+  - **Translucent Smoky Glass**: Refined neutral backdrop blur (`blur(16px) saturate(140%) contrast(106%)`) and consistent smoky glass transparency across every state, ensuring desktop wallpapers, text, and active windows remain visible through the glass at all times.
+  - **Preserved Full Transparency in Capsule**: The capsule never changes to a darker or opaque fill upon activation, preserving the exact same base color and see-through clarity as the bubble throughout the entire morph.
   - **Curved Specular Sheen**: Dynamic overhead light reflection that smoothly reshapes in tandem with the glass body.
   - **Zero Indicator Artifacts**: 100% clean and minimal—strictly free of blue/cyan dots, green LEDs, or artificial glowing indicators.
 - **Phase 3: Native Cursor Proximity Detection**
@@ -29,7 +30,7 @@ Nova Island is under active phased development.
     - **Idle** ($> 240\text{ px}$): Compact $32 \times 32\text{ px}$ bubble tucked behind the top bezel (`translateY(-24px)`), with only the bottom ~8px curved glass rim visible.
     - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Smoothly emerges downward ($38 \times 38\text{ px}$, `translateY(-8px)`), revealing its round spherical glass dome.
     - **Near** ($45\text{ px} < d \le 120\text{ px}$): Fully emerged softly oval bubble ($44 \times 40\text{ px}$, `translateY(-2px)`), anticipating activation.
-    - **Hovered / Activated** ($d \le 45\text{ px}$ or cursor inside capsule): Morphs continuously into a sleek $148 \times 34\text{ px}$ horizontal smoked-glass capsule settling 4px below bezel with subtle overshoot.
+    - **Hovered / Activated** ($d \le 45\text{ px}$ or cursor inside capsule): Morphs continuously into a sleek $148 \times 34\text{ px}$ horizontal capsule settling 4px below bezel with subtle overshoot, retaining full glass transparency.
   - Built-in 200ms anti-flicker hysteresis cooldown on exit transitions.
   - Strict zero focus stealing: The background proximity engine reads global coordinates without ever activating or stealing focus from active windows.
   - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
