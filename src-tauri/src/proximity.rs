@@ -61,7 +61,7 @@ pub struct ProximityConfig {
     pub near_threshold: f32,          // Logical px from top edge for progressive closer reveal (~45.0)
     pub entry_y_threshold: f32,       // Logical px max Y to detect entry into visible protrusion (~7.0)
     pub entry_radius: f32,            // Logical px half-width of protrusion entry (~16.0)
-    pub leave_threshold: f32,         // Logical px to auto-unlock if cursor leaves capsule (~80.0)
+    pub leave_threshold: f32,         // Logical px to auto-unlock if cursor leaves capsule (~70.0)
     pub poll_interval: Duration,
     pub leave_delay: Duration,
 }
@@ -73,7 +73,7 @@ impl Default for ProximityConfig {
             near_threshold: 45.0,
             entry_y_threshold: 7.0,
             entry_radius: 16.0,
-            leave_threshold: 80.0,
+            leave_threshold: 70.0,
             poll_interval: Duration::from_millis(20),
             leave_delay: Duration::from_millis(150),
         }
@@ -89,6 +89,21 @@ pub fn compute_anchor_and_window(cursor_x: f32, monitor_width: f32) -> (f32, f32
     (anchor_x, win_x_logical, offset_x)
 }
 
+/// Checks if the cursor is within the physical interactive bounds of the expanded capsule (148x34px).
+pub fn is_cursor_in_capsule(rel_x: f32, rel_y: f32, anchor_x: f32) -> bool {
+    rel_y >= 0.0 && rel_y <= 38.0 && (rel_x - anchor_x).abs() <= 74.0
+}
+
+/// Checks if the cursor is within the physical bounds of the tiny visible protrusion (28x4px).
+pub fn is_cursor_in_protrusion(
+    rel_x: f32,
+    rel_y: f32,
+    anchor_x: f32,
+    config: &ProximityConfig,
+) -> bool {
+    rel_y >= 0.0 && rel_y <= config.entry_y_threshold && (rel_x - anchor_x).abs() <= config.entry_radius
+}
+
 /// Determines the progressive proximity level.
 /// Crucial requirement: proximity alone NEVER opens the capsule. Hovered only triggers
 /// when the cursor physically enters the tiny 3-6px visible protrusion geometry.
@@ -99,7 +114,7 @@ pub fn determine_proximity_level(
 ) -> ProximityLevel {
     if dy > config.top_proximity_threshold || dy < 0.0 {
         ProximityLevel::Idle
-    } else if dy <= config.entry_y_threshold && dx_to_anchor.abs() <= config.entry_radius {
+    } else if is_cursor_in_protrusion(dx_to_anchor, dy, 0.0, config) {
         ProximityLevel::Hovered
     } else if dy <= config.near_threshold {
         ProximityLevel::Near
@@ -108,7 +123,7 @@ pub fn determine_proximity_level(
     }
 }
 
-/// Starts the lightweight background pointer-tracking and proximity detector.
+/// Starts the lightweight background pointer-tracking and proximity detector with dynamic input pass-through.
 pub fn start_proximity_detector(
     window: WebviewWindow,
     is_running: Arc<AtomicBool>,
@@ -122,7 +137,19 @@ pub fn start_proximity_detector(
         let mut last_win_phys_x = -9999i32;
         let mut pending_downgrade: Option<(ProximityLevel, Instant)> = None;
 
-        println!("[NovaIsland] Subtle pointer-anchored proximity detector thread started.");
+        // Tracks input transparency to prevent redundant OS system calls
+        let mut last_ignore: Option<bool> = None;
+        let mut update_ignore = |ignore: bool| {
+            if last_ignore != Some(ignore) {
+                last_ignore = Some(ignore);
+                let _ = window.set_ignore_cursor_events(ignore);
+            }
+        };
+
+        // Start with input pass-through active so desktop and Chrome tabs are 100% interactive
+        update_ignore(true);
+
+        println!("[NovaIsland] Native click-through proximity detector thread started.");
 
         while is_running.load(Ordering::Relaxed) {
             if let Ok(Some(monitor)) = window.primary_monitor() {
@@ -139,10 +166,17 @@ pub fn start_proximity_detector(
 
                     if locked {
                         // While locked (capsule expanded at anchor X), the window position is FROZEN.
+                        let in_capsule = is_cursor_in_capsule(rel_x, rel_y, last_anchor_x);
+
+                        // If cursor is inside the capsule: receive interactions.
+                        // If cursor is outside the capsule: pass clicks directly through to underlying applications!
+                        update_ignore(!in_capsule);
+
                         // Auto-unlock if cursor moves away from the capsule
                         let dx = (rel_x - last_anchor_x).abs();
-                        if rel_y > config.leave_threshold || dx > 120.0 || rel_y < -20.0 {
+                        if rel_y > config.leave_threshold || dx > 100.0 || rel_y < -20.0 {
                             is_anchor_locked.store(false, Ordering::Relaxed);
+                            update_ignore(true);
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
                                 if rel_y <= config.near_threshold {
                                     ProximityLevel::Near
@@ -169,7 +203,9 @@ pub fn start_proximity_detector(
                         let dy = rel_y;
 
                         if dy > config.top_proximity_threshold || dy < 0.0 {
-                            // Outside top proximity zone: Idle (invisible)
+                            // Outside top proximity zone: Idle (invisible) -> 100% desktop click-through
+                            update_ignore(true);
+
                             let now = Instant::now();
                             let should_downgrade = match pending_downgrade {
                                 Some((ProximityLevel::Idle, expire)) if now >= expire => true,
@@ -224,7 +260,13 @@ pub fn start_proximity_detector(
                             let raw_level = determine_proximity_level(dy, dx_to_anchor, &config);
 
                             if raw_level == ProximityLevel::Hovered {
+                                // Entering the protrusion: enable interactions and freeze anchor
+                                update_ignore(false);
                                 is_anchor_locked.store(true, Ordering::Relaxed);
+                            } else {
+                                // Preview visible, but cursor is outside the tiny protrusion:
+                                // Keep input pass-through active so Chrome tabs & controls receive 100% of clicks!
+                                update_ignore(true);
                             }
 
                             current_level = raw_level;
@@ -248,7 +290,7 @@ pub fn start_proximity_detector(
             thread::sleep(config.poll_interval);
         }
 
-        println!("[NovaIsland] Subtle pointer-anchored proximity detector thread terminated.");
+        println!("[NovaIsland] Native click-through proximity detector thread terminated.");
     });
 }
 
@@ -266,7 +308,6 @@ mod tests {
         assert_eq!(anchor_x, 78.0);
         assert_eq!(win_x, 0.0);
         assert_eq!(offset_x, 78.0);
-        // Physical position of anchor on monitor = win_x + offset_x
         assert_eq!(win_x + offset_x, 78.0);
 
         // 2. Left-Middle (cursor at x = 400px):
@@ -291,7 +332,6 @@ mod tests {
         assert_eq!(win_x + offset_x, 1500.0);
 
         // 5. Far Right (cursor at x = 1910px on a 1920 monitor):
-        // Anchor clamps to 1842.0 (1920 - 78)
         let (anchor_x, win_x, offset_x) = compute_anchor_and_window(1910.0, mon_width);
         assert_eq!(anchor_x, 1842.0);
         assert_eq!(win_x, 1680.0);
@@ -353,5 +393,28 @@ mod tests {
             determine_proximity_level(5.0, 40.0, &config),
             ProximityLevel::Near
         );
+    }
+
+    #[test]
+    fn test_click_through_hit_test_boundaries() {
+        let config = ProximityConfig::default();
+        let anchor_x = 960.0f32;
+
+        // Protrusion hit testing (28x4px visible)
+        assert!(is_cursor_in_protrusion(960.0, 4.0, anchor_x, &config));
+        assert!(is_cursor_in_protrusion(970.0, 6.0, anchor_x, &config));
+        // Chrome tab at y=20px is outside protrusion -> passes click to Chrome!
+        assert!(!is_cursor_in_protrusion(960.0, 20.0, anchor_x, &config));
+        // Adjacent Chrome tab at dx=30px is outside protrusion -> passes click to Chrome!
+        assert!(!is_cursor_in_protrusion(990.0, 4.0, anchor_x, &config));
+
+        // Capsule hit testing (148x34px)
+        assert!(is_cursor_in_capsule(960.0, 15.0, anchor_x));
+        assert!(is_cursor_in_capsule(960.0 + 70.0, 30.0, anchor_x));
+        assert!(is_cursor_in_capsule(960.0 - 70.0, 10.0, anchor_x));
+        // Outside capsule (dx > 74px) -> passes click to underlying application!
+        assert!(!is_cursor_in_capsule(960.0 + 85.0, 20.0, anchor_x));
+        // Below capsule (dy > 38px) -> passes click to underlying application!
+        assert!(!is_cursor_in_capsule(960.0, 45.0, anchor_x));
     }
 }

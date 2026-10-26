@@ -113,6 +113,14 @@ function App() {
     emitUnlock();
   };
 
+  const handleClick = () => {
+    if (isActivated || proximity === "hovered") {
+      setIsActivated(false);
+      setProximity("idle");
+      emitUnlock();
+    }
+  };
+
   // Direct activation takes highest precedence, then progressive proximity states
   const effectiveState: ProximityLevel = isActivated || proximity === "hovered"
     ? "hovered"
@@ -140,6 +148,7 @@ function App() {
         className={`glass-bubble state-${effectiveState}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
         data-tauri-drag-region
         aria-label="Nova Island Protrusion"
         data-proximity-level={effectiveState}

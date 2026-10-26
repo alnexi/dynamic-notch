@@ -1,6 +1,9 @@
 # Nova Island
 
-Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
+Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
+
+**Current Version:** `0.1.1`  
+**Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---
 
@@ -11,10 +14,10 @@ Nova Island is under active phased development.
 ### Implemented Features
 
 - **Phase 1: Project Foundation**
-  - Frameless, titlebar-less desktop window with native OS transparency support.
-  - Pinned on top of ordinary desktop windows (`alwaysOnTop`).
-  - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`).
-  - Click-through transparency: Window regions outside the visible interface use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
+  - Frameless, titlebar-less desktop overlay window with native OS transparency.
+  - Pinned on top of desktop windows (`alwaysOnTop`).
+  - High-DPI-aware coordinate alignment flush against the top edge of the primary display (`y = 0`).
+  - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
 - **Phase 2: Premium Transparent Glass Material + Motion Graphics**
   - **Visual Identity**: Understated transparent glass aesthetic with subtle optical depth and refined specular reflections.
   - **Continuous Morphing Animation**: A single continuous glass element that expands from a subtle curved protrusion into a horizontal interaction capsule with gentle, controlled overshoot settle (`cubic-bezier(0.2, 0.95, 0.3, 1.05)`).
@@ -33,9 +36,14 @@ Nova Island is under active phased development.
     - **Strict Rule — Proximity Alone Never Opens Capsule**: The capsule only opens when the user physically moves the cursor into the visible protrusion geometry.
   - **Hovered / Activated State**: Cursor entering the visible protrusion freezes anchor $X$ and smoothly expands into a $148 \times 34\text{ px}$ capsule right at the cursor's location.
   - **Edge Clamping**: Intelligent boundary clamping prevents the $148\text{ px}$ capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
-  - **Anti-Flicker & Interaction Reliability**: Generous hover capture zone on the protrusion prevents pointer-chasing and flickering while keeping the idle state fully non-blocking.
-  - **Keyboard & Click-Outside Dismissal**: Pressing `Escape` or clicking outside immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
-  - **Win32 Lifecycle Guard**: Native named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
+  - **Dynamic Native Click-Through (v0.1.1)**:
+    - Automatically enables native click-through (`set_ignore_cursor_events(true)`) whenever the pointer is outside the visible protrusion or expanded capsule.
+    - Chrome tabs, bookmarks, and adjacent controls receive 100% of mouse clicks without interference.
+    - Clicks outside the expanded capsule pass directly to underlying applications.
+  - **Zero Focus Stealing (v0.1.1)**:
+    - Configured with Win32 `WS_EX_NOACTIVATE` extended window style so showing or previewing the island never steals foreground keyboard or mouse focus from active applications.
+  - **Capsule Dismissal**:
+    - Clicking the expanded capsule, pressing `Escape`, or moving away immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
 
 ### Planned Features (Future Phases)
 
@@ -44,7 +52,7 @@ Nova Island is under active phased development.
   - System status indicators (battery, volume, brightness, mute state).
   - Compact notification and timer toasts.
   - User configuration and customization settings.
-  - Windows startup integration and auto-updater.
+  - Multi-monitor support and Windows startup integration.
 
 ---
 
@@ -53,8 +61,51 @@ Nova Island is under active phased development.
 - **Desktop Framework:** [Tauri 2](https://tauri.app/)
 - **Frontend:** [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/)
 - **Bundler:** [Vite 8](https://vitejs.dev/)
-- **Styling:** Vanilla CSS (Liquid glass aesthetics, caustic refraction, backdrop filters)
+- **Styling:** Vanilla CSS (Glass aesthetics, backdrop filters, spring easing)
 - **Native Layer:** [Rust](https://www.rust-lang.org/) with Win32 API (`user32`, `kernel32`)
+
+---
+
+## Versioning & Release Workflow
+
+Nova Island follows [Semantic Versioning (SemVer)](https://semver.org/):
+
+`MAJOR.MINOR.PATCH`
+
+- **PATCH:** Backward-compatible bug fixes and small compatible refinements (e.g., `0.1.1`).
+- **MINOR:** Backward-compatible new features (e.g., `0.2.0`).
+- **MAJOR:** Incompatible changes or milestone stable releases (e.g., `1.0.0`).
+
+### Synchronized Version Metadata
+Version identifiers are kept strictly identical across three project manifests:
+1. `package.json` (`version`)
+2. `src-tauri/tauri.conf.json` (`version`)
+3. `src-tauri/Cargo.toml` (`version`)
+
+CI validates this consistency on every push and pull request via `.github/workflows/ci.yml`.
+
+### Step-by-Step Release Procedure
+For every future published version:
+1. **Determine Version Increment**: Choose `PATCH`, `MINOR`, or `MAJOR` according to SemVer rules.
+2. **Update Version Manifests**: Update `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml` simultaneously.
+3. **Update Changelog**: Add a dated release section to `CHANGELOG.md` following [Keep a Changelog](https://keepachangelog.com/) standards (`Added`, `Changed`, `Fixed`, `Removed`, `Known Issues`).
+4. **Run Verification Suite**:
+   ```powershell
+   npm.cmd run build
+   cargo test --manifest-path src-tauri/Cargo.toml
+   ```
+5. **Review Git Diff & Status**: Inspect all staged changes to ensure no extraneous or sensitive files are included.
+6. **Commit Versioned Changes**:
+   ```powershell
+   git commit -m "chore(release): bump version to x.y.z"
+   ```
+7. **Push to GitHub**: Push the commit to the verified branch (`main`).
+8. **Create Git Tag**:
+   ```powershell
+   git tag -a vx.y.z -m "Release vx.y.z"
+   git push origin vx.y.z
+   ```
+9. **Publish GitHub Release**: Create a GitHub Release referencing the tag, with human-readable release notes derived from `CHANGELOG.md`. Do not attach downloadable binaries unless the build artifacts have been compiled and verified.
 
 ---
 
@@ -85,7 +136,7 @@ npm.cmd run dev
 ```
 
 ### 3. Build Frontend
-Runs the TypeScript type check and creates the production web bundle in `dist/`:
+Runs TypeScript type check and creates the production web bundle in `dist/`:
 ```powershell
 npm.cmd run build
 ```
@@ -97,11 +148,9 @@ npm.cmd run tauri dev
 ```
 
 ### 5. Run Rust Unit Tests
-Runs unit tests for pointer tracking math, edge clamping, and progressive reveal levels:
+Runs unit tests for pointer tracking math, edge clamping, progressive reveal, and click-through hit testing:
 ```powershell
-cd src-tauri
-cargo test
-cd ..
+cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
 ---
@@ -113,7 +162,7 @@ Windows WebView2 acquires an exclusive lock on its User Data Directory (`%LOCALA
 
 - **Cause:** Occurs if multiple instances of Nova Island are launched simultaneously or if an orphaned `msedgewebview2.exe` process from a previous crashed run holds the profile lock.
 - **Built-in Guard:** Nova Island includes a native Win32 `ProcessLifecycleGuard` in `src-tauri/src/main.rs`. It binds the application to a Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), ensuring that whenever the host process terminates, all child WebView2 processes are immediately cleaned up by the operating system. It also uses a named kernel mutex (`Local\NovaIsland_App_SingleInstance_Mutex`) to prevent duplicate instances from opening the same profile.
-- **Manual Cleanup (if needed):** If an orphaned process is lingering, run the following in PowerShell:
+- **Manual Cleanup (if needed):**
   ```powershell
   Get-Process -Name "nova-island*" -ErrorAction SilentlyContinue | Stop-Process -Force
   ```
@@ -126,6 +175,9 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 ## Project Structure
 
 ```
+├── .github/
+│   └── workflows/
+│       └── ci.yml           # Automated CI verification for build, tests & version consistency
 ├── .vscode/                 # Recommended editor configuration
 ├── public/                  # Static assets and icons
 ├── src/                     # React frontend
@@ -139,14 +191,15 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 │   ├── icons/               # Windows desktop application icons
 │   ├── src/
 │   │   ├── main.rs          # Win32 lifecycle guard, mutex & entry point
-│   │   ├── lib.rs           # Window setup, anchor locking & Tauri run loop
+│   │   ├── lib.rs           # Window setup, WS_EX_NOACTIVATE, click-through & Tauri run loop
 │   │   └── proximity.rs     # Win32 cursor tracking & progressive reveal engine
 │   ├── Cargo.toml           # Rust package configuration & dependencies
 │   ├── build.rs             # Tauri build script
 │   └── tauri.conf.json      # Window size, transparency & bundle config
 ├── .gitignore               # Ignored build outputs and sensitive files
+├── CHANGELOG.md             # Semantic versioned release history
 ├── index.html               # Frameless transparent web container
-├── package.json             # NPM dependencies and scripts
+├── package.json             # NPM dependencies, scripts & project version
 ├── tsconfig.json            # TypeScript configuration
 └── vite.config.ts           # Vite development and build settings
 ```

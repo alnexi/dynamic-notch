@@ -56,7 +56,28 @@ pub fn run() {
                     ProximityConfig::default(),
                 );
 
-                // Reveal the window once accurately positioned
+                // Configure native Windows window flags to prevent focus stealing from Chrome/active apps
+                #[cfg(target_os = "windows")]
+                {
+                    #[link(name = "user32")]
+                    extern "system" {
+                        fn GetWindowLongW(hWnd: *mut std::ffi::c_void, nIndex: i32) -> i32;
+                        fn SetWindowLongW(hWnd: *mut std::ffi::c_void, nIndex: i32, dwNewLong: i32) -> i32;
+                    }
+                    const GWL_EXSTYLE: i32 = -20;
+                    const WS_EX_NOACTIVATE: i32 = 0x08000000;
+
+                    if let Ok(hwnd) = window.hwnd() {
+                        let hwnd_ptr = hwnd.0;
+                        unsafe {
+                            let ex_style = GetWindowLongW(hwnd_ptr, GWL_EXSTYLE);
+                            SetWindowLongW(hwnd_ptr, GWL_EXSTYLE, ex_style | WS_EX_NOACTIVATE);
+                        }
+                    }
+                }
+
+                // Initial state: ignore cursor events so all desktop clicks pass through
+                let _ = window.set_ignore_cursor_events(true);
                 let _ = window.show();
             } else {
                 eprintln!("[NovaIsland] ERROR: 'main' window not found!");

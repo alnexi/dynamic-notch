@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-and-test:
+    name: Build & Test Validation
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm.cmd ci || npm.cmd install
+
+      - name: Verify Version Consistency
+        shell: pwsh
+        run: |
+          $pkgVer = (Get-Content "package.json" | ConvertFrom-Json).version
+          $tauriVer = (Get-Content "src-tauri/tauri.conf.json" | ConvertFrom-Json).version
+          $cargoVer = (Get-Content "src-tauri/Cargo.toml" | Select-String '^version = "(.*)"').Matches.Groups[1].Value
+          Write-Host "package.json: $pkgVer"
+          Write-Host "tauri.conf.json: $tauriVer"
+          Write-Host "Cargo.toml: $cargoVer"
+          if ($pkgVer -ne $tauriVer -or $tauriVer -ne $cargoVer) {
+            Write-Error "Version mismatch detected across project files!"
+            exit 1
+          }
+          Write-Host "Version validation succeeded ($pkgVer)."
+
+      - name: Build frontend bundle
+        run: npm.cmd run build
+
+      - name: Run Rust unit tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
