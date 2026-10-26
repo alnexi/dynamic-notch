@@ -83,17 +83,11 @@ function App() {
         onMouseEnter={() => setIsPointerInside(true)}
         onMouseLeave={() => setIsPointerInside(false)}
         data-tauri-drag-region
-        aria-label="Nova Island Glass Droplet"
+        aria-label="Nova Island Water Droplet"
         data-proximity-level={effectiveState}
       >
-        <div className="droplet-specular" />
-        <div className="droplet-optic">
-          <span className="optic-flute flute-left" />
-          <div className="optic-lens">
-            <span className="optic-dot" />
-          </div>
-          <span className="optic-flute flute-right" />
-        </div>
+        <div className="droplet-glint" />
+        <div className="droplet-caustic" />
       </div>
     </div>
   );

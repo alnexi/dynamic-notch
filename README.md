@@ -1,6 +1,6 @@
 # Nova Island
 
-Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives as an unobtrusive, translucent smoked-glass droplet anchored to the top-center edge of the primary monitor that organically expands into an interactive capsule as the cursor approaches or hovers.
+Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React**, **TypeScript**, **Vite**, and **Rust**, it lives as an unobtrusive, crystal-clear water droplet hanging from the top-center edge of the primary monitor that organically stretches and emerges downward with liquid surface tension as the cursor approaches or hovers.
 
 ---
 
@@ -14,21 +14,23 @@ Nova Island is under active phased development.
   - Frameless, titlebar-less desktop window with native OS transparency support.
   - Pinned on top of ordinary desktop windows (`alwaysOnTop`).
   - High-DPI-aware coordinate alignment positioned flush against the top edge of the primary display (`y = 0`, centered horizontally).
-  - Click-through transparency: Window regions outside the island use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
-- **Phase 2: Glass Droplet UI**
-  - Premium translucent smoked-glass material with layered dark gradients, optical backdrop blur, and delicate hairline refraction highlights.
-  - Specular Fresnel reflection sheen simulating curved glass curvature.
-  - Precision 4px emerald sensor optic nested inside a beveled micro-lens socket.
-  - Fluid, organic morphing driven by a tailored cubic-bezier easing curve (`cubic-bezier(0.16, 1, 0.3, 1)`).
+  - Click-through transparency: Window regions outside the droplet use `pointer-events: none`, preserving full clickability and focus for underlying desktop applications.
+- **Phase 2: Realistic Transparent Water Droplet UI**
+  - Organic, smooth water droplet silhouette emerging naturally from the top bezel of the monitor.
+  - Ultra-high translucency: Underneath desktop content, wallpapers, and application windows remain visible through the droplet body.
+  - Realistic water optical properties: subtle refraction blur, delicate silvery edge meniscus highlights, specular overhead glint, and internal caustic refraction pool.
+  - Restrained, natural soft caustic shadow grounding the droplet without dark smudges.
+  - 100% clean and natural: Free from artificial glowing dots, indicator LEDs, or decorative lines.
+  - Fluid, liquid-surface-tension morphing driven by a tailored organic easing curve (`cubic-bezier(0.18, 0.9, 0.26, 1)`).
 - **Phase 3: Native Cursor Proximity Detection**
   - Low-overhead Win32 `GetCursorPos` polling thread (30ms interval, 0.0% CPU overhead, no global hook).
   - High-DPI physical-to-logical coordinate translation relative to the primary display.
-  - Elliptical interaction halo matching the horizontal proportions of the island.
+  - Elliptical interaction halo matching the horizontal proportions of the droplet.
   - Progressive 4-stage proximity state machine:
-    - **Idle** ($> 240\text{ px}$): Compact $38 \times 16\text{ px}$ smoked-glass droplet.
-    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Gently awakens to $56 \times 19\text{ px}$ with increased luminescence.
-    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Swells to $100 \times 25\text{ px}$ as interior fluting accents softly emerge.
-    - **Hovered** ($d \le 45\text{ px}$ or cursor directly over window): Fully expands to the $216 \times 40\text{ px}$ dark glossy capsule.
+    - **Idle** ($> 240\text{ px}$): Compact $32 \times 14\text{ px}$ transparent dewdrop resting at the top bezel.
+    - **Approaching** ($120\text{ px} < d \le 240\text{ px}$): Swells and emerges downward to $52 \times 21\text{ px}$.
+    - **Near** ($45\text{ px} < d \le 120\text{ px}$): Deepens into a heavier teardrop ($96 \times 30\text{ px}$) with focused caustic light.
+    - **Hovered** ($d \le 45\text{ px}$ or cursor directly over droplet): Fully emerges into a lush, organic $156 \times 39\text{ px}$ water droplet.
   - Built-in 200ms anti-flicker hysteresis cooldown on exit transitions.
   - Strict zero focus stealing: The background proximity engine reads global coordinates without ever activating or stealing focus from active windows.
   - Win32 `ProcessLifecycleGuard` with named kernel mutex and Windows Job Object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`) to prevent duplicate instances and eliminate orphaned WebView2 child processes.
@@ -49,7 +51,7 @@ Nova Island is under active phased development.
 - **Desktop Framework:** [Tauri 2](https://tauri.app/)
 - **Frontend:** [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/)
 - **Bundler:** [Vite 8](https://vitejs.dev/)
-- **Styling:** Vanilla CSS (Hardware glass aesthetics, CSS variables, backdrop filters)
+- **Styling:** Vanilla CSS (Liquid glass aesthetics, caustic refraction, backdrop filters)
 - **Native Layer:** [Rust](https://www.rust-lang.org/) with Win32 API (`user32`, `kernel32`)
 
 ---
@@ -126,7 +128,7 @@ On Windows, if running `npm` produces a script execution policy error regarding 
 ├── public/                  # Static assets and icons
 ├── src/                     # React frontend
 │   ├── App.tsx              # Nova Island component & proximity listener
-│   ├── App.css              # Smoked-glass droplet, animations & easing
+│   ├── App.css              # Liquid water droplet styling, caustics & easing
 │   ├── main.tsx             # React DOM root entry point
 │   └── vite-env.d.ts        # Vite environment typings
 ├── src-tauri/               # Native Rust application layer
