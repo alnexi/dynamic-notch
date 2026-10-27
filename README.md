@@ -2,7 +2,7 @@
 
 Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
-**Current Version:** `0.1.1`  
+**Current Version:** `0.2.0`  
 **Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---
@@ -34,22 +34,34 @@ Nova Island is under active phased development.
     - **Approaching** ($45\text{ px} < dy \le 90\text{ px}$): Only a tiny curved edge emerges from the screen bezel ($28\text{ px}$ wide, visible height of approximately $3.5\text{ px}$). Understated transparent glass with no obvious glow or bright border.
     - **Near** ($7\text{ px} < dy \le 45\text{ px}$): Protrusion becomes slightly more visible ($30\text{ px}$ wide, visible height of approximately $5.5\text{ px}$), but remains compact.
     - **Strict Rule — Proximity Alone Never Opens Capsule**: The capsule only opens when the user physically moves the cursor into the visible protrusion geometry.
-  - **Hovered / Activated State**: Cursor entering the visible protrusion freezes anchor $X$ and smoothly expands into a $148 \times 34\text{ px}$ capsule right at the cursor's location.
-  - **Edge Clamping**: Intelligent boundary clamping prevents the $148\text{ px}$ capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
-  - **Dynamic Native Click-Through (v0.1.1)**:
-    - Automatically enables native click-through (`set_ignore_cursor_events(true)`) whenever the pointer is outside the visible protrusion or expanded capsule.
+  - **Hovered / Activated State**: Cursor entering the visible protrusion freezes anchor $X$ and smoothly expands into an interaction capsule right at the cursor's location.
+  - **Edge Clamping**: Intelligent boundary clamping prevents the capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
+  - **Dynamic Native Click-Through (v0.1.1 & v0.2.0)**:
+    - Automatically enables native click-through (`set_ignore_cursor_events(true)`) whenever the pointer is outside the visible protrusion or dynamic expanded capsule.
+    - Dynamically synchronizes OS hit-test half-width with the number of active tasks.
     - Chrome tabs, bookmarks, and adjacent controls receive 100% of mouse clicks without interference.
     - Clicks outside the expanded capsule pass directly to underlying applications.
-  - **Zero Focus Stealing (v0.1.1)**:
+  - **Zero Focus Stealing**:
     - Configured with Win32 `WS_EX_NOACTIVATE` extended window style so showing or previewing the island never steals foreground keyboard or mouse focus from active applications.
   - **Capsule Dismissal**:
     - Clicking the expanded capsule, pressing `Escape`, or moving away immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
+- **Phase 4: Smart Capsule & Active Tasks (v0.2.0)**
+  - **Centered Clock**: The hovered capsule always presents a clean, tabular digit clock (`HH:MM`) strictly in the visual center. Symmetrical CSS Grid layout (`1fr auto 1fr`) ensures the clock remains mathematically centered regardless of slot occupancy.
+  - **Windows Media Playback Integration (GSMTC)**: Reads Windows WinRT `GlobalSystemMediaTransportControlsSessionManager` in real time to detect active playback, track title, artist, application identity (Spotify, Chrome, Edge), and live cover artwork streamed via base64 data URIs.
+  - **Active Tasks Architecture**: Generic `TaskManager` tracking real system tasks (Media, Timers, Alarms). No mock or fake placeholder indicators.
+  - **Dynamic Horizontal Expansion**: Capsule dynamically expands horizontally only as much as necessary:
+    - 0 tasks: Compact 92px capsule (clock only).
+    - 1 task: 136px capsule (task icon + centered clock).
+    - 2 tasks: 172px capsule (left task + centered clock + right task).
+    - 3+ tasks: 208px capsule.
+  - **Adaptive Glass Contrast**: Win32 desktop background luminance sampling ($Y = 0.2126R + 0.7152G + 0.0722B$) behind the capsule anchor point automatically selects between dark and light foreground typography/icons, maintaining high contrast without compromising the transparent smoky glass material.
+  - **Backend IPC Commands**: Exposed Tauri commands (`start_timer`, `cancel_timer`, `set_alarm`, `cancel_alarm`, `get_active_tasks`) for programmatic task management.
 
 ### Planned Features (Future Phases)
 
-- **Phase 4+: Dynamic Activities & Content Slots**
-  - Now Playing media controls and audio visualizer.
-  - System status indicators (battery, volume, brightness, mute state).
+- **Phase 5+: Expanded Dynamic Island Controls**
+  - Expanded interactive media controls overlay (play/pause, skip, scrub bar).
+  - System status indicators (battery, volume level, brightness).
   - Compact notification and timer toasts.
   - User configuration and customization settings.
   - Multi-monitor support and Windows startup integration.

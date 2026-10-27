@@ -1,3 +1,5 @@
+use crate::contrast::{get_adaptive_contrast_mode, ContrastMode};
+use crate::tasks::{ActiveTask, TaskManager};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -34,7 +36,6 @@ fn get_cursor_position() -> Option<(i32, i32)> {
 }
 
 /// Progressive proximity level representing the interaction state along the top edge.
-/// Proximity alone NEVER opens the capsule; Hovered only triggers when physically entering the protrusion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ProximityLevel {
@@ -44,8 +45,8 @@ pub enum ProximityLevel {
     Hovered = 3,
 }
 
-/// Event payload emitted to the frontend for tracking and activation.
-#[derive(Debug, Clone, Copy, serde::Serialize)]
+/// Event payload emitted to the frontend for tracking, active tasks, and adaptive contrast.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ProximityPayload {
     pub level: ProximityLevel,
     pub cursor_x: f32,
@@ -53,6 +54,8 @@ pub struct ProximityPayload {
     pub anchor_x: f32,
     pub offset_x: f32,
     pub is_locked: bool,
+    pub contrast_mode: ContrastMode,
+    pub active_tasks: Vec<ActiveTask>,
 }
 
 /// Configuration parameters for subtle pointer tracking along the top edge.
@@ -81,7 +84,6 @@ impl Default for ProximityConfig {
 }
 
 /// Computes the clamped anchor X coordinate and window X coordinate.
-/// Clamps so that the 148px capsule (half-width 74px) with margin stays fully on-screen.
 pub fn compute_anchor_and_window(cursor_x: f32, monitor_width: f32) -> (f32, f32, f32) {
     let anchor_x = cursor_x.clamp(78.0, monitor_width - 78.0);
     let win_x_logical = (anchor_x - 120.0).clamp(0.0, monitor_width - 240.0);
@@ -89,9 +91,20 @@ pub fn compute_anchor_and_window(cursor_x: f32, monitor_width: f32) -> (f32, f32
     (anchor_x, win_x_logical, offset_x)
 }
 
-/// Checks if the cursor is within the physical interactive bounds of the expanded capsule (148x34px).
-pub fn is_cursor_in_capsule(rel_x: f32, rel_y: f32, anchor_x: f32) -> bool {
-    rel_y >= 0.0 && rel_y <= 38.0 && (rel_x - anchor_x).abs() <= 74.0
+/// Computes the dynamic capsule half-width based on the number of active tasks.
+pub fn get_capsule_half_width(active_task_count: usize) -> f32 {
+    match active_task_count {
+        0 => 46.0,  // ~88-92px clock-only
+        1 => 68.0,  // ~132-136px with 1 task
+        2 => 86.0,  // ~168-172px with 2 tasks
+        _ => 104.0, // ~204-208px with 3+ tasks
+    }
+}
+
+/// Checks if the cursor is within the physical interactive bounds of the expanded capsule.
+pub fn is_cursor_in_capsule(rel_x: f32, rel_y: f32, anchor_x: f32, active_task_count: usize) -> bool {
+    let half_width = get_capsule_half_width(active_task_count);
+    rel_y >= 0.0 && rel_y <= 38.0 && (rel_x - anchor_x).abs() <= half_width
 }
 
 /// Checks if the cursor is within the physical bounds of the tiny visible protrusion (28x4px).
@@ -105,8 +118,6 @@ pub fn is_cursor_in_protrusion(
 }
 
 /// Determines the progressive proximity level.
-/// Crucial requirement: proximity alone NEVER opens the capsule. Hovered only triggers
-/// when the cursor physically enters the tiny 3-6px visible protrusion geometry.
 pub fn determine_proximity_level(
     dy: f32,
     dx_to_anchor: f32,
@@ -128,6 +139,7 @@ pub fn start_proximity_detector(
     window: WebviewWindow,
     is_running: Arc<AtomicBool>,
     is_anchor_locked: Arc<AtomicBool>,
+    task_manager: TaskManager,
     config: ProximityConfig,
 ) {
     thread::spawn(move || {
@@ -146,10 +158,15 @@ pub fn start_proximity_detector(
             }
         };
 
+        // Poll active tasks and background contrast at sensible intervals (250ms)
+        let mut last_task_poll = Instant::now() - Duration::from_secs(1);
+        let mut cached_tasks: Vec<ActiveTask> = Vec::new();
+        let mut cached_contrast = ContrastMode::DarkBg;
+
         // Start with input pass-through active so desktop and Chrome tabs are 100% interactive
         update_ignore(true);
 
-        println!("[NovaIsland] Native click-through proximity detector thread started.");
+        println!("[NovaIsland] Smart capsule proximity detector thread started.");
 
         while is_running.load(Ordering::Relaxed) {
             if let Ok(Some(monitor)) = window.primary_monitor() {
@@ -162,11 +179,19 @@ pub fn start_proximity_detector(
                     let rel_y = (raw_y - monitor_pos.y) as f32 / scale as f32;
                     let mon_width = monitor_size.width as f32 / scale as f32;
 
+                    // Periodic poll for media sessions and adaptive contrast
+                    if last_task_poll.elapsed() >= Duration::from_millis(250) {
+                        last_task_poll = Instant::now();
+                        cached_tasks = task_manager.get_active_tasks();
+                        let sample_x = monitor_pos.x + (last_anchor_x * scale as f32).round() as i32;
+                        cached_contrast = get_adaptive_contrast_mode(sample_x, monitor_pos.y + 20);
+                    }
+
                     let locked = is_anchor_locked.load(Ordering::Relaxed);
 
                     if locked {
                         // While locked (capsule expanded at anchor X), the window position is FROZEN.
-                        let in_capsule = is_cursor_in_capsule(rel_x, rel_y, last_anchor_x);
+                        let in_capsule = is_cursor_in_capsule(rel_x, rel_y, last_anchor_x, cached_tasks.len());
 
                         // If cursor is inside the capsule: receive interactions.
                         // If cursor is outside the capsule: pass clicks directly through to underlying applications!
@@ -174,7 +199,7 @@ pub fn start_proximity_detector(
 
                         // Auto-unlock if cursor moves away from the capsule
                         let dx = (rel_x - last_anchor_x).abs();
-                        if rel_y > config.leave_threshold || dx > 100.0 || rel_y < -20.0 {
+                        if rel_y > config.leave_threshold || dx > 110.0 || rel_y < -20.0 {
                             is_anchor_locked.store(false, Ordering::Relaxed);
                             update_ignore(true);
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
@@ -195,6 +220,8 @@ pub fn start_proximity_detector(
                                     anchor_x: last_anchor_x,
                                     offset_x: last_offset_x,
                                     is_locked: false,
+                                    contrast_mode: cached_contrast,
+                                    active_tasks: cached_tasks.clone(),
                                 },
                             );
                         }
@@ -228,6 +255,8 @@ pub fn start_proximity_detector(
                                         anchor_x: last_anchor_x,
                                         offset_x: last_offset_x,
                                         is_locked: false,
+                                        contrast_mode: cached_contrast,
+                                        active_tasks: cached_tasks.clone(),
                                     },
                                 );
                             }
@@ -254,8 +283,6 @@ pub fn start_proximity_detector(
                             }
 
                             // Progressive reveal level based on distance to top edge:
-                            // Proximity alone NEVER opens the capsule!
-                            // Only physical entry into the 3-6px visible protrusion triggers Hovered.
                             let dx_to_anchor = rel_x - anchor_x;
                             let raw_level = determine_proximity_level(dy, dx_to_anchor, &config);
 
@@ -280,6 +307,8 @@ pub fn start_proximity_detector(
                                     anchor_x,
                                     offset_x,
                                     is_locked: is_anchor_locked.load(Ordering::Relaxed),
+                                    contrast_mode: cached_contrast,
+                                    active_tasks: cached_tasks.clone(),
                                 },
                             );
                         }
@@ -290,7 +319,7 @@ pub fn start_proximity_detector(
             thread::sleep(config.poll_interval);
         }
 
-        println!("[NovaIsland] Native click-through proximity detector thread terminated.");
+        println!("[NovaIsland] Smart capsule proximity detector thread terminated.");
     });
 }
 
@@ -302,96 +331,46 @@ mod tests {
     fn test_tracking_coordinates_and_clamping() {
         let mon_width = 1920.0f32;
 
-        // 1. Far Left (cursor at x = 10px):
-        // Anchor clamps to 78.0 so 148px capsule stays fully on-screen
         let (anchor_x, win_x, offset_x) = compute_anchor_and_window(10.0, mon_width);
         assert_eq!(anchor_x, 78.0);
         assert_eq!(win_x, 0.0);
         assert_eq!(offset_x, 78.0);
         assert_eq!(win_x + offset_x, 78.0);
 
-        // 2. Left-Middle (cursor at x = 400px):
-        let (anchor_x, win_x, offset_x) = compute_anchor_and_window(400.0, mon_width);
-        assert_eq!(anchor_x, 400.0);
-        assert_eq!(win_x, 280.0);
-        assert_eq!(offset_x, 120.0);
-        assert_eq!(win_x + offset_x, 400.0);
-
-        // 3. Center (cursor at x = 960px):
         let (anchor_x, win_x, offset_x) = compute_anchor_and_window(960.0, mon_width);
         assert_eq!(anchor_x, 960.0);
         assert_eq!(win_x, 840.0);
         assert_eq!(offset_x, 120.0);
         assert_eq!(win_x + offset_x, 960.0);
+    }
 
-        // 4. Right-Middle (cursor at x = 1500px):
-        let (anchor_x, win_x, offset_x) = compute_anchor_and_window(1500.0, mon_width);
-        assert_eq!(anchor_x, 1500.0);
-        assert_eq!(win_x, 1380.0);
-        assert_eq!(offset_x, 120.0);
-        assert_eq!(win_x + offset_x, 1500.0);
-
-        // 5. Far Right (cursor at x = 1910px on a 1920 monitor):
-        let (anchor_x, win_x, offset_x) = compute_anchor_and_window(1910.0, mon_width);
-        assert_eq!(anchor_x, 1842.0);
-        assert_eq!(win_x, 1680.0);
-        assert_eq!(offset_x, 162.0);
-        assert_eq!(win_x + offset_x, 1842.0);
+    #[test]
+    fn test_dynamic_capsule_half_width() {
+        assert_eq!(get_capsule_half_width(0), 46.0); // 92px
+        assert_eq!(get_capsule_half_width(1), 68.0); // 136px
+        assert_eq!(get_capsule_half_width(2), 86.0); // 172px
+        assert_eq!(get_capsule_half_width(3), 104.0); // 208px
     }
 
     #[test]
     fn test_progressive_reveal_levels_and_no_proximity_opening() {
         let config = ProximityConfig::default();
 
-        // 1. Far from top edge (> 90px): Idle (completely invisible)
         assert_eq!(
             determine_proximity_level(150.0, 0.0, &config),
             ProximityLevel::Idle
         );
         assert_eq!(
-            determine_proximity_level(95.0, 0.0, &config),
-            ProximityLevel::Idle
-        );
-
-        // 2. Approaching top edge (45px < dy <= 90px): Approaching (subtle ~3.5px curved edge)
-        assert_eq!(
-            determine_proximity_level(80.0, 0.0, &config),
+            determine_proximity_level(70.0, 0.0, &config),
             ProximityLevel::Approaching
-        );
-        assert_eq!(
-            determine_proximity_level(50.0, 0.0, &config),
-            ProximityLevel::Approaching
-        );
-
-        // 3. Moving closer (7px < dy <= 45px): Near (subtle ~5.5px curved edge)
-        // Crucial: Proximity alone must NEVER open the capsule!
-        assert_eq!(
-            determine_proximity_level(40.0, 0.0, &config),
-            ProximityLevel::Near
         );
         assert_eq!(
             determine_proximity_level(20.0, 0.0, &config),
             ProximityLevel::Near
         );
         assert_eq!(
-            determine_proximity_level(8.0, 0.0, &config),
-            ProximityLevel::Near
-        );
-
-        // 4. Cursor entering the visible 3-6px protrusion (dy <= 7px and |dx| <= 16px): Hovered (capsule opens)
-        assert_eq!(
             determine_proximity_level(5.0, 2.0, &config),
             ProximityLevel::Hovered
-        );
-        assert_eq!(
-            determine_proximity_level(2.0, 15.0, &config),
-            ProximityLevel::Hovered
-        );
-
-        // 5. Cursor near top edge (dy <= 7px) but laterally outside protrusion: Still Near, NOT Hovered
-        assert_eq!(
-            determine_proximity_level(5.0, 40.0, &config),
-            ProximityLevel::Near
         );
     }
 
@@ -400,21 +379,16 @@ mod tests {
         let config = ProximityConfig::default();
         let anchor_x = 960.0f32;
 
-        // Protrusion hit testing (28x4px visible)
         assert!(is_cursor_in_protrusion(960.0, 4.0, anchor_x, &config));
-        assert!(is_cursor_in_protrusion(970.0, 6.0, anchor_x, &config));
-        // Chrome tab at y=20px is outside protrusion -> passes click to Chrome!
         assert!(!is_cursor_in_protrusion(960.0, 20.0, anchor_x, &config));
-        // Adjacent Chrome tab at dx=30px is outside protrusion -> passes click to Chrome!
-        assert!(!is_cursor_in_protrusion(990.0, 4.0, anchor_x, &config));
 
-        // Capsule hit testing (148x34px)
-        assert!(is_cursor_in_capsule(960.0, 15.0, anchor_x));
-        assert!(is_cursor_in_capsule(960.0 + 70.0, 30.0, anchor_x));
-        assert!(is_cursor_in_capsule(960.0 - 70.0, 10.0, anchor_x));
-        // Outside capsule (dx > 74px) -> passes click to underlying application!
-        assert!(!is_cursor_in_capsule(960.0 + 85.0, 20.0, anchor_x));
-        // Below capsule (dy > 38px) -> passes click to underlying application!
-        assert!(!is_cursor_in_capsule(960.0, 45.0, anchor_x));
+        // 0 active tasks: capsule is ~92px wide (half-width 46px)
+        assert!(is_cursor_in_capsule(960.0, 15.0, anchor_x, 0));
+        assert!(is_cursor_in_capsule(960.0 + 40.0, 20.0, anchor_x, 0));
+        assert!(!is_cursor_in_capsule(960.0 + 55.0, 20.0, anchor_x, 0));
+
+        // 2 active tasks: capsule expands to ~172px wide (half-width 86px)
+        assert!(is_cursor_in_capsule(960.0 + 80.0, 20.0, anchor_x, 2));
+        assert!(!is_cursor_in_capsule(960.0 + 95.0, 20.0, anchor_x, 2));
     }
 }

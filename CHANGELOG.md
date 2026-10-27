@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-10-27
+
+### Summary
+Introduced the Smart Capsule with centered clock, dynamic active task indicators (Windows Media GSMTC, Timers, Alarms), dynamic horizontal expansion matching native click-through boundaries, and adaptive glass contrast.
+
+### Added
+- **Centered Clock**: The expanded capsule always presents a clean, tabular digit clock (`HH:MM`) strictly in the visual center. Symmetrical CSS Grid layout (`1fr auto 1fr`) ensures the clock remains mathematically centered regardless of slot occupancy.
+- **Dynamic Active Tasks Management**: Real-time native `TaskManager` tracking active tasks without placeholder or fake indicators:
+  - **Media Playback Status**: Integrated with Windows WinRT `GlobalSystemMediaTransportControlsSessionManager` (GSMTC) to detect active playback, track metadata, source application identity (Spotify, Chrome, Edge), and real-time cover artwork via base64 data URIs.
+  - **Timer & Alarm Support**: First-class tracking for countdown timers and scheduled alarms, with automatic slot assignment (`slot-left` for media, `slot-right` for timers and alarms).
+  - **Tauri IPC Commands**: Added `start_timer`, `cancel_timer`, `set_alarm`, `cancel_alarm`, and `get_active_tasks` backend commands.
+- **Dynamic Capsule Expansion & Hit-Testing**:
+  - The capsule expands horizontally only as much as necessary: 92px (clock only), 136px (1 task), 172px (2 tasks), 208px (3+ tasks).
+  - The native Rust background thread dynamically synchronizes its hit-test boundary (`get_capsule_half_width`) with active task count, ensuring mouse clicks outside the dynamic capsule pass straight to desktop and browser controls.
+- **Adaptive Glass Contrast**:
+  - Win32 desktop background luminance sampling ($Y = 0.2126R + 0.7152G + 0.0722B$) behind the capsule anchor point with Windows registry theme fallback.
+  - Automatically switches between `.contrast-light-bg` and `.contrast-dark-bg`, adapting text and icon contrast while strictly preserving transparent smoky glass material across all states.
+- **Test Suite Expansion**: Added unit tests for dynamic capsule half-width calculation, timer lifecycle management, and alarm lifecycle management.
+
+### Changed
+- Bumped semantic version to `0.2.0` across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+
+---
+
 ## [0.1.1] - 2026-10-26
 
 ### Summary

@@ -1,15 +1,54 @@
+mod contrast;
+mod media;
 mod proximity;
+mod tasks;
 
 use proximity::{start_proximity_detector, ProximityConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use tasks::{ActiveTask, TaskManager};
 use tauri::{Listener, Manager, PhysicalPosition, Position};
+
+#[tauri::command]
+fn start_timer(state: tauri::State<TaskManager>, seconds: u64, label: Option<String>) -> String {
+    state.start_timer(seconds, label)
+}
+
+#[tauri::command]
+fn cancel_timer(state: tauri::State<TaskManager>, id: String) -> bool {
+    state.cancel_timer(&id)
+}
+
+#[tauri::command]
+fn set_alarm(state: tauri::State<TaskManager>, hour: u32, minute: u32, label: Option<String>) -> String {
+    state.set_alarm(hour, minute, label)
+}
+
+#[tauri::command]
+fn cancel_alarm(state: tauri::State<TaskManager>, id: String) -> bool {
+    state.cancel_alarm(&id)
+}
+
+#[tauri::command]
+fn get_active_tasks(state: tauri::State<TaskManager>) -> Vec<ActiveTask> {
+    state.get_active_tasks()
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let task_manager = TaskManager::new();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .setup(|app| {
+        .manage(task_manager.clone())
+        .invoke_handler(tauri::generate_handler![
+            start_timer,
+            cancel_timer,
+            set_alarm,
+            cancel_alarm,
+            get_active_tasks
+        ])
+        .setup(move |app| {
             println!("[NovaIsland] Setting up main window...");
             if let Some(window) = app.get_webview_window("main") {
                 println!("[NovaIsland] Main window found.");
@@ -53,6 +92,7 @@ pub fn run() {
                     window.clone(),
                     is_running,
                     Arc::clone(&is_anchor_locked),
+                    task_manager,
                     ProximityConfig::default(),
                 );
 

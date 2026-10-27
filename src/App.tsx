@@ -1,21 +1,14 @@
 import { useEffect, useState, useCallback } from "react";
 import "./App.css";
-
-export type ProximityLevel = "idle" | "approaching" | "near" | "hovered";
-
-export interface ProximityPayload {
-  level: ProximityLevel;
-  cursor_x: number;
-  cursor_y: number;
-  anchor_x: number;
-  offset_x: number;
-  is_locked: boolean;
-}
+import { ActiveTask, ContrastMode, ProximityLevel, ProximityPayload } from "./types/tasks";
+import { SmartCapsule } from "./components/SmartCapsule";
 
 function App() {
   const [proximity, setProximity] = useState<ProximityLevel>("idle");
   const [offsetX, setOffsetX] = useState<number>(120);
   const [isActivated, setIsActivated] = useState<boolean>(false);
+  const [contrastMode, setContrastMode] = useState<ContrastMode>("dark-bg");
+  const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
 
   // Helper to emit events to Rust backend
   const emitUnlock = useCallback(async () => {
@@ -40,7 +33,7 @@ function App() {
     }
   }, []);
 
-  // Listen for native cursor proximity changes & anchor coordinates from Rust
+  // Listen for native cursor proximity changes, active tasks & adaptive contrast from Rust
   useEffect(() => {
     let unlisten: (() => void) | undefined;
 
@@ -56,6 +49,12 @@ function App() {
               }
               if (typeof p.offset_x === "number") {
                 setOffsetX(p.offset_x);
+              }
+              if (p.contrast_mode) {
+                setContrastMode(p.contrast_mode);
+              }
+              if (Array.isArray(p.active_tasks)) {
+                setActiveTasks(p.active_tasks);
               }
               if (p.level === "hovered" || p.is_locked) {
                 setIsActivated(true);
@@ -130,6 +129,15 @@ function App() {
     ? "approaching"
     : "idle";
 
+  // Task count determines the horizontal expansion class
+  const taskCountClass = activeTasks.length === 0
+    ? "tasks-count-0"
+    : activeTasks.length === 1
+    ? "tasks-count-1"
+    : activeTasks.length === 2
+    ? "tasks-count-2"
+    : "tasks-count-many";
+
   return (
     <div
       className="island-wrapper"
@@ -137,23 +145,28 @@ function App() {
       style={{ "--bubble-offset": `${offsetX}px` } as React.CSSProperties}
     >
       {/* 
-        Subtle Pointer-Anchored Protrusion & Capsule:
-        - Idle: completely invisible, zero input interception.
-        - Approaching: tiny 3-4px curved edge emerges at current pointer X coordinate.
-        - Near: compact 5.5px curved edge (proximity alone NEVER opens the capsule).
-        - Hovered: cursor enters protrusion -> freezes anchor X and expands into 148x34px capsule right at cursor.
-        - Full transparent glass appearance maintained across all states.
+        Nova Island — Smart Capsule with Active Tasks & Centered Clock:
+        - Idle: 100% invisible, click-through everywhere.
+        - Approaching: subtle curved glass protrusion.
+        - Hovered: expands to display Centered Clock + Active Task Indicators.
+        - Dynamically expands horizontally only as needed for active tasks.
+        - Fully transparent glass preserved across all states.
       */}
       <div
-        className={`glass-bubble state-${effectiveState}`}
+        className={`glass-bubble state-${effectiveState} ${taskCountClass} contrast-${contrastMode}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         data-tauri-drag-region
-        aria-label="Nova Island Protrusion"
+        aria-label="Nova Island Smart Capsule"
         data-proximity-level={effectiveState}
       >
         <div className="glass-specular" />
+
+        {/* Content rendered when in expanded hovered state */}
+        {effectiveState === "hovered" && (
+          <SmartCapsule activeTasks={activeTasks} contrastMode={contrastMode} />
+        )}
       </div>
     </div>
   );

@@ -231,7 +231,7 @@ html, body, #root {
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-hovered {
-  width: 148px;
+  width: 92px;
   height: 34px;
   border-radius: 17px;
   transform: translateX(-50%) translateY(4px);
@@ -246,6 +246,23 @@ html, body, #root {
     0 5px 16px rgba(0, 0, 0, 0.20);
 }
 
+/* Dynamic capsule horizontal expansion based on active task count */
+.glass-bubble.state-hovered.tasks-count-0 {
+  width: 92px; /* Clock only: compact 92px */
+}
+
+.glass-bubble.state-hovered.tasks-count-1 {
+  width: 136px; /* 1 task: ~136px */
+}
+
+.glass-bubble.state-hovered.tasks-count-2 {
+  width: 172px; /* 2 tasks: ~172px */
+}
+
+.glass-bubble.state-hovered.tasks-count-many {
+  width: 208px; /* 3+ tasks: ~208px */
+}
+
 .glass-bubble.state-hovered .glass-specular {
   opacity: 0.82;
   left: 8%;
@@ -253,3 +270,140 @@ html, body, #root {
   height: 46%;
   border-radius: 14px 14px 0 0;
 }
+
+/* 
+  =============================================================================
+  Nova Island — Smart Capsule Layout & Components
+  - Symmetrical CSS Grid guarantees the clock remains strictly in the visual center
+  - Dynamic width matches the native hit-test boundary for 100% click-through
+  - Clean, modern, distraction-free typography with tabular numbers
+  =============================================================================
+*/
+.capsule-smart-layout {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 0 10px;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.capsule-slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.capsule-slot.slot-left {
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.capsule-slot.slot-center {
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.capsule-slot.slot-right {
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+/* Clock typography */
+.capsule-clock {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+/* Task Icon and artwork styling */
+.task-icon-wrapper {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  position: relative;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+
+.task-icon-artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  display: block;
+}
+
+.task-svg-icon {
+  width: 14px;
+  height: 14px;
+  display: block;
+  transition: color 0.3s ease;
+}
+
+.task-svg-icon.app-spotify {
+  color: #1ed760;
+}
+
+.task-svg-icon.app-chrome {
+  color: #4285f4;
+}
+
+/* 
+  =============================================================================
+  Adaptive Glass Contrast Modes
+  - Automatically adjusts clock and icon contrast based on background luminance
+  - Preserves transparent glass structure (no solid or opaque block fills)
+  =============================================================================
+*/
+
+/* Light desktop background: dark foreground typography & icons */
+.glass-bubble.contrast-light-bg {
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.40),
+    0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.contrast-light-bg .capsule-clock {
+  color: rgba(18, 22, 28, 0.94);
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.contrast-light-bg .task-svg-icon:not(.app-spotify):not(.app-chrome) {
+  color: rgba(18, 22, 28, 0.88);
+}
+
+/* Dark desktop background: crisp, bright foreground typography & icons */
+.glass-bubble.contrast-dark-bg {
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1.5px rgba(255, 255, 255, 0.12),
+    0 5px 16px rgba(0, 0, 0, 0.20);
+}
+
+.contrast-dark-bg .capsule-clock {
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.contrast-dark-bg .task-svg-icon:not(.app-spotify):not(.app-chrome) {
+  color: rgba(255, 255, 255, 0.90);
+}
+
