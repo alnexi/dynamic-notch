@@ -23,6 +23,8 @@ export interface ProximityPayload {
   anchor_x: number;
   offset_x: number;
   is_locked: boolean;
+  is_expanded?: boolean;
+  monitor_width?: number;
   contrast_mode?: ContrastMode;
   active_tasks?: ActiveTask[];
 }

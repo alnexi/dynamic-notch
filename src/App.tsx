@@ -1,14 +1,20 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import "./App.css";
 import { ActiveTask, ContrastMode, ProximityLevel, ProximityPayload } from "./types/tasks";
 import { SmartCapsule } from "./components/SmartCapsule";
+import { computeCapsuleGeometry } from "./utils/geometry";
 
 function App() {
   const [proximity, setProximity] = useState<ProximityLevel>("idle");
   const [offsetX, setOffsetX] = useState<number>(120);
   const [isActivated, setIsActivated] = useState<boolean>(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [monitorWidth, setMonitorWidth] = useState<number>(() => {
+    return typeof window !== "undefined" ? window.innerWidth || 1920 : 1920;
+  });
   const [contrastMode, setContrastMode] = useState<ContrastMode>("dark-bg");
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const isCollapsingRef = useRef<boolean>(false);
 
   // Helper to emit events to Rust backend
   const emitUnlock = useCallback(async () => {
@@ -33,15 +39,39 @@ function App() {
     }
   }, []);
 
-  // Listen for native cursor proximity changes, active tasks & adaptive contrast from Rust
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
+  const emitExpand = useCallback(async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("nova-expand-capsule", { expanded: true });
+      } catch (err) {
+        console.warn("Failed to emit nova-expand-capsule:", err);
+      }
+    }
+  }, []);
 
-    async function subscribeProximity() {
+  const emitCollapse = useCallback(async () => {
+    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+      try {
+        const { emit } = await import("@tauri-apps/api/event");
+        await emit("nova-collapse-capsule", { expanded: false });
+      } catch (err) {
+        console.warn("Failed to emit nova-collapse-capsule:", err);
+      }
+    }
+  }, []);
+
+  // Listen for native cursor proximity changes, active tasks, contrast & collapse events from Rust
+  useEffect(() => {
+    let unlistenProximity: (() => void) | undefined;
+    let unlistenCollapse: (() => void) | undefined;
+
+    async function subscribeEvents() {
       if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
         try {
           const { listen } = await import("@tauri-apps/api/event");
-          unlisten = await listen<ProximityPayload>("nova-proximity", (event) => {
+
+          unlistenProximity = await listen<ProximityPayload>("nova-proximity", (event) => {
             const p = event.payload;
             if (p) {
               if (p.level) {
@@ -50,46 +80,75 @@ function App() {
               if (typeof p.offset_x === "number") {
                 setOffsetX(p.offset_x);
               }
+              if (typeof p.monitor_width === "number" && p.monitor_width > 0) {
+                setMonitorWidth(p.monitor_width);
+              }
               if (p.contrast_mode) {
                 setContrastMode(p.contrast_mode);
               }
               if (Array.isArray(p.active_tasks)) {
                 setActiveTasks(p.active_tasks);
               }
+              if (p.is_expanded !== undefined && !p.is_expanded && isExpanded) {
+                setIsExpanded(false);
+              }
               if (p.level === "hovered" || p.is_locked) {
                 setIsActivated(true);
               } else if (p.level === "idle") {
                 setIsActivated(false);
+                setIsExpanded(false);
               }
             }
           });
+
+          unlistenCollapse = await listen("nova-collapse", () => {
+            setIsExpanded(false);
+          });
         } catch (err) {
-          console.warn("Unable to subscribe to nova-proximity events:", err);
+          console.warn("Unable to subscribe to native events:", err);
         }
       }
     }
 
-    subscribeProximity();
+    subscribeEvents();
 
     return () => {
-      if (unlisten) {
-        unlisten();
+      if (unlistenProximity) {
+        unlistenProximity();
+      }
+      if (unlistenCollapse) {
+        unlistenCollapse();
       }
     };
+  }, [isExpanded]);
+
+  // Window resize handler to maintain accurate monitor dimensions
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== "undefined") {
+        setMonitorWidth(window.innerWidth || 1920);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Keyboard and window blur handling for dismissing / unlocking
+  // Keyboard and window blur handling for dismissing / unlocking / collapsing
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
+        setIsExpanded(false);
         setIsActivated(false);
         setProximity("idle");
+        emitCollapse();
         emitUnlock();
       }
     };
 
     const handleBlur = () => {
+      setIsExpanded(false);
       setIsActivated(false);
+      emitCollapse();
       emitUnlock();
     };
 
@@ -100,7 +159,7 @@ function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("blur", handleBlur);
     };
-  }, [emitUnlock]);
+  }, [emitCollapse, emitUnlock]);
 
   const handleMouseEnter = () => {
     setIsActivated(true);
@@ -108,20 +167,34 @@ function App() {
   };
 
   const handleMouseLeave = () => {
-    setIsActivated(false);
-    emitUnlock();
-  };
-
-  const handleClick = () => {
-    if (isActivated || proximity === "hovered") {
+    if (isExpanded) {
+      // Smooth automatic collapse on mouse leave without requiring another click
+      setIsExpanded(false);
+      isCollapsingRef.current = true;
+      setTimeout(() => {
+        isCollapsingRef.current = false;
+      }, 420);
+      emitCollapse();
+    } else {
       setIsActivated(false);
-      setProximity("idle");
       emitUnlock();
     }
   };
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Prevent accidental re-expansion during collapse transition
+    if (isCollapsingRef.current) return;
+
+    // Expand on click: Clicking the small capsule expands it to ~3.5x collapsed width
+    if (!isExpanded && (isActivated || proximity === "hovered")) {
+      setIsExpanded(true);
+      emitExpand();
+    }
+  };
+
   // Direct activation takes highest precedence, then progressive proximity states
-  const effectiveState: ProximityLevel = isActivated || proximity === "hovered"
+  const effectiveState: ProximityLevel = isActivated || proximity === "hovered" || isExpanded
     ? "hovered"
     : proximity === "near"
     ? "near"
@@ -138,22 +211,37 @@ function App() {
     ? "tasks-count-2"
     : "tasks-count-many";
 
+  // Intelligently compute capsule geometry with boundary clamping and symmetrical or edge-favored expansion
+  const geometry = computeCapsuleGeometry(
+    offsetX,
+    activeTasks.length,
+    isExpanded,
+    monitorWidth
+  );
+
   return (
     <div
       className="island-wrapper"
       data-tauri-drag-region
-      style={{ "--bubble-offset": `${offsetX}px` } as React.CSSProperties}
+      style={{
+        "--bubble-offset": `${geometry.centerX}px`,
+        "--capsule-width": `${geometry.width}px`,
+      } as React.CSSProperties}
     >
       {/* 
-        Nova Island — Smart Capsule with Active Tasks & Centered Clock:
+        Nova Island — Smooth Smart Capsule Expansion (v0.3.0):
         - Idle: 100% invisible, click-through everywhere.
         - Approaching: subtle curved glass protrusion.
-        - Hovered: expands to display Centered Clock + Active Task Indicators.
-        - Dynamically expands horizontally only as needed for active tasks.
+        - Hovered (Collapsed): compact capsule with centered clock + active tasks.
+        - Clicked (Expanded): expands horizontally to ~3.5x collapsed width.
+        - Symmetrical when room permits; edge-favored near left/right screen corners.
+        - Mouse leave: smooth upward retraction back to collapsed/idle state.
         - Fully transparent glass preserved across all states.
       */}
       <div
-        className={`glass-bubble state-${effectiveState} ${taskCountClass} contrast-${contrastMode}`}
+        className={`glass-bubble state-${effectiveState} ${taskCountClass} contrast-${contrastMode} ${
+          isExpanded ? "is-expanded" : ""
+        }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
@@ -163,7 +251,7 @@ function App() {
       >
         <div className="glass-specular" />
 
-        {/* Content rendered when in expanded hovered state */}
+        {/* Content rendered when in expanded or compact hovered state */}
         {effectiveState === "hovered" && (
           <SmartCapsule activeTasks={activeTasks} contrastMode={contrastMode} />
         )}

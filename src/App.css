@@ -80,16 +80,17 @@ html, body, #root {
     inset 0 -1px 1.2px rgba(255, 255, 255, 0.10),
     0 3px 10px rgba(0, 0, 0, 0.16);
 
-  /* Polished motion-graphics transition with spring-like settle */
+  /* Polished motion-graphics transition with spring-like settle and smooth horizontal expansion */
   transition:
-    width 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
+    width 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    left 0.42s cubic-bezier(0.16, 1, 0.3, 1),
     height 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     border-radius 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     transform 0.38s cubic-bezier(0.2, 0.95, 0.3, 1.05),
     opacity 0.22s ease,
     border-color 0.32s ease,
     box-shadow 0.32s ease;
-  will-change: width, height, border-radius, transform, opacity, box-shadow;
+  will-change: width, left, height, border-radius, transform, opacity, box-shadow;
 }
 
 /* 
@@ -231,7 +232,7 @@ html, body, #root {
   -----------------------------------------------------------------------------
 */
 .glass-bubble.state-hovered {
-  width: 92px;
+  width: var(--capsule-width, 92px);
   height: 34px;
   border-radius: 17px;
   transform: translateX(-50%) translateY(4px);
@@ -246,21 +247,40 @@ html, body, #root {
     0 5px 16px rgba(0, 0, 0, 0.20);
 }
 
-/* Dynamic capsule horizontal expansion based on active task count */
-.glass-bubble.state-hovered.tasks-count-0 {
-  width: 92px; /* Clock only: compact 92px */
+/* Collapsed capsule width matching active task count (when NOT expanded) */
+.glass-bubble.state-hovered:not(.is-expanded).tasks-count-0 {
+  width: var(--capsule-width, 92px); /* Clock only: compact 92px */
 }
 
-.glass-bubble.state-hovered.tasks-count-1 {
-  width: 136px; /* 1 task: ~136px */
+.glass-bubble.state-hovered:not(.is-expanded).tasks-count-1 {
+  width: var(--capsule-width, 136px); /* 1 task: ~136px */
 }
 
-.glass-bubble.state-hovered.tasks-count-2 {
-  width: 172px; /* 2 tasks: ~172px */
+.glass-bubble.state-hovered:not(.is-expanded).tasks-count-2 {
+  width: var(--capsule-width, 172px); /* 2 tasks: ~172px */
 }
 
-.glass-bubble.state-hovered.tasks-count-many {
-  width: 208px; /* 3+ tasks: ~208px */
+.glass-bubble.state-hovered:not(.is-expanded).tasks-count-many {
+  width: var(--capsule-width, 208px); /* 3+ tasks: ~208px */
+}
+
+/* 
+  Expanded state on click (v0.3.0):
+  - Approximately 3.5x collapsed width (calculated in geometry.ts)
+  - Horizontal expansion only (preserves 34px height)
+  - Attached flush to top edge
+  - Retains 100% transparent glass appearance, specular sheen, and contrast
+*/
+.glass-bubble.state-hovered.is-expanded {
+  width: var(--capsule-width, 322px);
+  cursor: default;
+}
+
+.glass-bubble.state-hovered.is-expanded .glass-specular {
+  left: 5%;
+  right: 5%;
+  height: 48%;
+  opacity: 0.85;
 }
 
 .glass-bubble.state-hovered .glass-specular {

@@ -55,20 +55,28 @@ pub fn run() {
                 if let Ok(Some(monitor)) = window.primary_monitor() {
                     let monitor_pos = monitor.position();
                     let monitor_size = monitor.size();
-                    if let Ok(window_size) = window.outer_size() {
-                        let x = monitor_pos.x + (monitor_size.width as i32 - window_size.width as i32) / 2;
-                        let y = monitor_pos.y;
-                        let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
-                    }
+                    let scale = monitor.scale_factor();
+                    let x = monitor_pos.x;
+                    let y = monitor_pos.y;
+                    let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
+                    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                        monitor_size.width,
+                        (56.0 * scale).round() as u32,
+                    )));
                 }
 
-                // Native proximity detection and anchor locking
+                // Native proximity detection, anchor locking, and capsule expansion
                 let is_running = Arc::new(AtomicBool::new(true));
                 let is_running_cleanup = Arc::clone(&is_running);
 
                 let is_anchor_locked = Arc::new(AtomicBool::new(false));
                 let lock_listener = Arc::clone(&is_anchor_locked);
                 let unlock_listener = Arc::clone(&is_anchor_locked);
+
+                let is_capsule_expanded = Arc::new(AtomicBool::new(false));
+                let expand_listener = Arc::clone(&is_capsule_expanded);
+                let collapse_listener = Arc::clone(&is_capsule_expanded);
+                let unlock_collapse = Arc::clone(&is_capsule_expanded);
 
                 window.listen("nova-lock-anchor", move |_| {
                     println!("[NovaIsland] Anchor locked by frontend.");
@@ -78,6 +86,17 @@ pub fn run() {
                 window.listen("nova-unlock-anchor", move |_| {
                     println!("[NovaIsland] Anchor unlocked by frontend.");
                     unlock_listener.store(false, Ordering::Relaxed);
+                    unlock_collapse.store(false, Ordering::Relaxed);
+                });
+
+                window.listen("nova-expand-capsule", move |_| {
+                    println!("[NovaIsland] Capsule expanded by frontend.");
+                    expand_listener.store(true, Ordering::Relaxed);
+                });
+
+                window.listen("nova-collapse-capsule", move |_| {
+                    println!("[NovaIsland] Capsule collapsed by frontend.");
+                    collapse_listener.store(false, Ordering::Relaxed);
                 });
 
                 // Ensure clean thread shutdown when window closes
@@ -92,6 +111,7 @@ pub fn run() {
                     window.clone(),
                     is_running,
                     Arc::clone(&is_anchor_locked),
+                    Arc::clone(&is_capsule_expanded),
                     task_manager,
                     ProximityConfig::default(),
                 );

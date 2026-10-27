@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.3.0] - 2026-10-27
+
+### Summary
+Introduced smooth smart capsule horizontal expansion on click (~3.5x collapsed width), intelligent boundary positioning (symmetrical near center, edge-favored near left/right screen corners), smooth upward mouse-leave collapse with oscillation prevention, synchronized native hit-testing across the primary monitor width, and a comprehensive test suite covering expansion geometry and boundaries.
+
+### Added
+- **Click-to-Expand Interaction**: Clicking the compact capsule expands it horizontally to approximately 3.5 times its collapsed width (calculated dynamically from actual collapsed width: 92px $\rightarrow$ 322px for clock-only, scaling up to 728px for multiple active tasks).
+- **Intelligent Horizontal Positioning (`src/utils/geometry.ts`, `src-tauri/src/proximity.rs`)**:
+  - **Near Center**: Symmetrical expansion left and right around the anchor point.
+  - **Near Left Corner**: Pins the left edge to the screen margin and expands primarily to the right, strictly avoiding screen boundary clipping.
+  - **Near Right Corner**: Pins the right edge to the screen margin and expands primarily to the left, strictly avoiding screen boundary clipping.
+  - **Monitor Boundary Clamping**: Respects actual monitor boundaries and bezel safety margins across arbitrary pointer positions.
+- **Smooth Mouse-Leave Collapse**:
+  - Automatically collapses back toward the top edge when the cursor leaves the expanded interactive region, without requiring a second click.
+  - Coordinated width, height, transform, and opacity transitions with Apple-inspired `cubic-bezier(0.16, 1, 0.3, 1)` easing for smooth, organic retraction.
+  - Oscillation prevention: Expansion strictly requires an explicit click; pointer movement inside the expanded area does not cause false mouse leave, and collapsing does not retrigger expansion.
+- **Synchronized Native Window & Hit-Testing (`src-tauri/src/lib.rs`, `src-tauri/src/proximity.rs`)**:
+  - Aligned native Tauri window size to cover the primary monitor width (`monitor_size.width`), eliminating window boundary clipping and removing OS window repositioning overhead.
+  - Native hit-testing dynamically switches to expanded bounds (`is_cursor_in_expanded_capsule`), ensuring desktop click-through is 100% maintained outside the dynamic capsule footprint.
+- **Test Suite Expansion**: Added unit tests covering center symmetrical expansion, left-corner pinning, right-corner pinning, 3.5x factor calculation, and expanded hit-test boundary checks (11 tests passing).
+
+### Changed
+- Bumped semantic version to `0.3.0` across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+
+---
+
 ## [0.2.0] - 2026-10-27
 
 ### Summary

@@ -2,7 +2,7 @@
 
 Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
-**Current Version:** `0.2.0`  
+**Current Version:** `0.3.0`  
 **Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---
@@ -36,30 +36,35 @@ Nova Island is under active phased development.
     - **Strict Rule — Proximity Alone Never Opens Capsule**: The capsule only opens when the user physically moves the cursor into the visible protrusion geometry.
   - **Hovered / Activated State**: Cursor entering the visible protrusion freezes anchor $X$ and smoothly expands into an interaction capsule right at the cursor's location.
   - **Edge Clamping**: Intelligent boundary clamping prevents the capsule from clipping off the monitor ($78\text{ px} \le \text{anchor}_X \le W_{\text{monitor}} - 78\text{ px}$).
-  - **Dynamic Native Click-Through (v0.1.1 & v0.2.0)**:
+  - **Dynamic Native Click-Through (v0.1.1, v0.2.0 & v0.3.0)**:
     - Automatically enables native click-through (`set_ignore_cursor_events(true)`) whenever the pointer is outside the visible protrusion or dynamic expanded capsule.
-    - Dynamically synchronizes OS hit-test half-width with the number of active tasks.
+    - Dynamically synchronizes OS hit-test boundaries with the capsule's expanded interactive state.
     - Chrome tabs, bookmarks, and adjacent controls receive 100% of mouse clicks without interference.
     - Clicks outside the expanded capsule pass directly to underlying applications.
   - **Zero Focus Stealing**:
     - Configured with Win32 `WS_EX_NOACTIVATE` extended window style so showing or previewing the island never steals foreground keyboard or mouse focus from active applications.
   - **Capsule Dismissal**:
-    - Clicking the expanded capsule, pressing `Escape`, or moving away immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
+    - Moving away, pressing `Escape`, or window blur immediately deactivates the capsule, unlocks the anchor, and smoothly collapses back to idle.
 - **Phase 4: Smart Capsule & Active Tasks (v0.2.0)**
   - **Centered Clock**: The hovered capsule always presents a clean, tabular digit clock (`HH:MM`) strictly in the visual center. Symmetrical CSS Grid layout (`1fr auto 1fr`) ensures the clock remains mathematically centered regardless of slot occupancy.
   - **Windows Media Playback Integration (GSMTC)**: Reads Windows WinRT `GlobalSystemMediaTransportControlsSessionManager` in real time to detect active playback, track title, artist, application identity (Spotify, Chrome, Edge), and live cover artwork streamed via base64 data URIs.
   - **Active Tasks Architecture**: Generic `TaskManager` tracking real system tasks (Media, Timers, Alarms). No mock or fake placeholder indicators.
-  - **Dynamic Horizontal Expansion**: Capsule dynamically expands horizontally only as much as necessary:
-    - 0 tasks: Compact 92px capsule (clock only).
-    - 1 task: 136px capsule (task icon + centered clock).
-    - 2 tasks: 172px capsule (left task + centered clock + right task).
-    - 3+ tasks: 208px capsule.
   - **Adaptive Glass Contrast**: Win32 desktop background luminance sampling ($Y = 0.2126R + 0.7152G + 0.0722B$) behind the capsule anchor point automatically selects between dark and light foreground typography/icons, maintaining high contrast without compromising the transparent smoky glass material.
-  - **Backend IPC Commands**: Exposed Tauri commands (`start_timer`, `cancel_timer`, `set_alarm`, `cancel_alarm`, `get_active_tasks`) for programmatic task management.
+- **Phase 5: Smooth Smart Capsule Expansion (v0.3.0)**
+  - **Click-to-Expand Interaction**: Clicking the compact capsule expands it horizontally to approximately 3.5 times its collapsed width ($92\text{ px} \rightarrow 322\text{ px}$ for clock only, scaling up to $728\text{ px}$ with multiple active tasks).
+  - **Intelligent Horizontal Positioning**:
+    - Symmetrical expansion left and right when centered along the screen.
+    - Edge-favored expansion near left and right screen bezels, strictly preventing the capsule from extending beyond the monitor boundaries.
+  - **Smooth Mouse-Leave Collapse**:
+    - Automatically retracts upward back to the compact state upon mouse leave with Apple-style `cubic-bezier(0.16, 1, 0.3, 1)` easing.
+    - Prevents state oscillation and rapid re-expansion loops.
+  - **Synchronized Native Window**:
+    - Sized to primary monitor width (`monitor_size.width`), eliminating OS repositioning jitter and boundary clipping.
+    - Hit-testing dynamically covers the full expanded footprint while preserving 100% click-through outside.
 
 ### Planned Features (Future Phases)
 
-- **Phase 5+: Expanded Dynamic Island Controls**
+- **Phase 6+: Expanded Dynamic Island Controls**
   - Expanded interactive media controls overlay (play/pause, skip, scrub bar).
   - System status indicators (battery, volume level, brightness).
   - Compact notification and timer toasts.

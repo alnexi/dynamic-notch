@@ -1,6 +1,6 @@
 [package]
 name = "nova-island"
-version = "0.2.0"
+version = "0.3.0"
 description = "Nova Island - Dynamic Island for Windows"
 authors = ["Nova Island Team"]
 edition = "2021"

@@ -45,6 +45,10 @@ pub enum ProximityLevel {
     Hovered = 3,
 }
 
+/// Constants for capsule expansion and safe edge positioning
+pub const EXPANSION_FACTOR: f32 = 3.5;
+pub const SCREEN_MARGIN: f32 = 10.0;
+
 /// Event payload emitted to the frontend for tracking, active tasks, and adaptive contrast.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ProximityPayload {
@@ -53,7 +57,9 @@ pub struct ProximityPayload {
     pub cursor_y: f32,
     pub anchor_x: f32,
     pub offset_x: f32,
+    pub monitor_width: f32,
     pub is_locked: bool,
+    pub is_expanded: bool,
     pub contrast_mode: ContrastMode,
     pub active_tasks: Vec<ActiveTask>,
 }
@@ -84,6 +90,7 @@ impl Default for ProximityConfig {
 }
 
 /// Computes the clamped anchor X coordinate and window X coordinate.
+#[allow(dead_code)]
 pub fn compute_anchor_and_window(cursor_x: f32, monitor_width: f32) -> (f32, f32, f32) {
     let anchor_x = cursor_x.clamp(78.0, monitor_width - 78.0);
     let win_x_logical = (anchor_x - 120.0).clamp(0.0, monitor_width - 240.0);
@@ -101,7 +108,45 @@ pub fn get_capsule_half_width(active_task_count: usize) -> f32 {
     }
 }
 
-/// Checks if the cursor is within the physical interactive bounds of the expanded capsule.
+/// Computes the expanded bounds (left, right, center) for the capsule at anchor_x.
+/// Uses approximately 3.5x collapsed width, clamped to screen boundaries [SCREEN_MARGIN, mon_width - SCREEN_MARGIN].
+/// - Near center: expands symmetrically around anchor_x.
+/// - Near left corner: pins left to SCREEN_MARGIN and expands rightward.
+/// - Near right corner: pins right to mon_width - SCREEN_MARGIN and expands leftward.
+pub fn compute_expanded_bounds(
+    anchor_x: f32,
+    active_task_count: usize,
+    mon_width: f32,
+) -> (f32, f32, f32) {
+    let safe_mon_width = mon_width.max(800.0);
+    let collapsed_w = get_capsule_half_width(active_task_count) * 2.0;
+    let target_w = (collapsed_w * EXPANSION_FACTOR).min(safe_mon_width - 2.0 * SCREEN_MARGIN);
+    let half_w = target_w / 2.0;
+
+    let min_left = SCREEN_MARGIN;
+    let max_right = safe_mon_width - SCREEN_MARGIN;
+
+    let mut left = anchor_x - half_w;
+    let mut right = anchor_x + half_w;
+
+    if left < min_left {
+        left = min_left;
+        right = (min_left + target_w).min(max_right);
+    } else if right > max_right {
+        right = max_right;
+        left = (max_right - target_w).max(min_left);
+    }
+
+    let center = (left + right) / 2.0;
+    (left, right, center)
+}
+
+/// Checks if the cursor is within the physical interactive bounds of the expanded capsule (v0.3.0).
+pub fn is_cursor_in_expanded_capsule(rel_x: f32, rel_y: f32, left: f32, right: f32) -> bool {
+    rel_y >= 0.0 && rel_y <= 42.0 && rel_x >= (left - 4.0) && rel_x <= (right + 4.0)
+}
+
+/// Checks if the cursor is within the physical interactive bounds of the collapsed capsule.
 pub fn is_cursor_in_capsule(rel_x: f32, rel_y: f32, anchor_x: f32, active_task_count: usize) -> bool {
     let half_width = get_capsule_half_width(active_task_count);
     rel_y >= 0.0 && rel_y <= 38.0 && (rel_x - anchor_x).abs() <= half_width
@@ -139,6 +184,7 @@ pub fn start_proximity_detector(
     window: WebviewWindow,
     is_running: Arc<AtomicBool>,
     is_anchor_locked: Arc<AtomicBool>,
+    is_capsule_expanded: Arc<AtomicBool>,
     task_manager: TaskManager,
     config: ProximityConfig,
 ) {
@@ -146,7 +192,6 @@ pub fn start_proximity_detector(
         let mut current_level = ProximityLevel::Idle;
         let mut last_anchor_x = 0.0f32;
         let mut last_offset_x = 120.0f32;
-        let mut last_win_phys_x = -9999i32;
         let mut pending_downgrade: Option<(ProximityLevel, Instant)> = None;
 
         // Tracks input transparency to prevent redundant OS system calls
@@ -188,20 +233,38 @@ pub fn start_proximity_detector(
                     }
 
                     let locked = is_anchor_locked.load(Ordering::Relaxed);
+                    let is_expanded = is_capsule_expanded.load(Ordering::Relaxed);
 
-                    if locked {
-                        // While locked (capsule expanded at anchor X), the window position is FROZEN.
-                        let in_capsule = is_cursor_in_capsule(rel_x, rel_y, last_anchor_x, cached_tasks.len());
+                    if locked || is_expanded {
+                        // While locked/expanded at anchor X, calculate interactive bounds
+                        let (exp_left, exp_right, _exp_center) =
+                            compute_expanded_bounds(last_anchor_x, cached_tasks.len(), mon_width);
 
-                        // If cursor is inside the capsule: receive interactions.
-                        // If cursor is outside the capsule: pass clicks directly through to underlying applications!
+                        let in_capsule = if is_expanded {
+                            is_cursor_in_expanded_capsule(rel_x, rel_y, exp_left, exp_right)
+                        } else {
+                            is_cursor_in_capsule(rel_x, rel_y, last_anchor_x, cached_tasks.len())
+                        };
+
+                        // If cursor is inside: interact. Outside: pass clicks directly through to Chrome/desktop!
                         update_ignore(!in_capsule);
 
-                        // Auto-unlock if cursor moves away from the capsule
-                        let dx = (rel_x - last_anchor_x).abs();
-                        if rel_y > config.leave_threshold || dx > 110.0 || rel_y < -20.0 {
+                        // Auto-unlock/collapse if cursor moves far away from the capsule
+                        let is_far_away = if is_expanded {
+                            rel_y > (config.leave_threshold + 15.0)
+                                || rel_x < (exp_left - 30.0)
+                                || rel_x > (exp_right + 30.0)
+                                || rel_y < -20.0
+                        } else {
+                            let dx = (rel_x - last_anchor_x).abs();
+                            rel_y > config.leave_threshold || dx > 110.0 || rel_y < -20.0
+                        };
+
+                        if is_far_away {
                             is_anchor_locked.store(false, Ordering::Relaxed);
+                            is_capsule_expanded.store(false, Ordering::Relaxed);
                             update_ignore(true);
+
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
                                 if rel_y <= config.near_threshold {
                                     ProximityLevel::Near
@@ -211,6 +274,8 @@ pub fn start_proximity_detector(
                             } else {
                                 ProximityLevel::Idle
                             };
+
+                            let _ = window.emit("nova-collapse", ());
                             let _ = window.emit(
                                 "nova-proximity",
                                 ProximityPayload {
@@ -219,7 +284,9 @@ pub fn start_proximity_detector(
                                     cursor_y: rel_y,
                                     anchor_x: last_anchor_x,
                                     offset_x: last_offset_x,
+                                    monitor_width: mon_width,
                                     is_locked: false,
+                                    is_expanded: false,
                                     contrast_mode: cached_contrast,
                                     active_tasks: cached_tasks.clone(),
                                 },
@@ -254,7 +321,9 @@ pub fn start_proximity_detector(
                                         cursor_y: rel_y,
                                         anchor_x: last_anchor_x,
                                         offset_x: last_offset_x,
+                                        monitor_width: mon_width,
                                         is_locked: false,
+                                        is_expanded: false,
                                         contrast_mode: cached_contrast,
                                         active_tasks: cached_tasks.clone(),
                                     },
@@ -264,23 +333,9 @@ pub fn start_proximity_detector(
                             // Inside top proximity zone: smoothly track pointer horizontal position
                             pending_downgrade = None;
 
-                            let (anchor_x, win_x_logical, offset_x) =
-                                compute_anchor_and_window(rel_x, mon_width);
-
+                            let anchor_x = rel_x.clamp(SCREEN_MARGIN, mon_width - SCREEN_MARGIN);
                             last_anchor_x = anchor_x;
-                            last_offset_x = offset_x;
-
-                            // Calculate physical window coordinate
-                            let win_x_phys = monitor_pos.x + (win_x_logical * scale as f32).round() as i32;
-                            let win_y_phys = monitor_pos.y;
-
-                            // Reposition native window if physical X changed by at least 1px
-                            if (win_x_phys - last_win_phys_x).abs() >= 1 {
-                                last_win_phys_x = win_x_phys;
-                                let _ = window.set_position(tauri::Position::Physical(
-                                    tauri::PhysicalPosition::new(win_x_phys, win_y_phys),
-                                ));
-                            }
+                            last_offset_x = anchor_x;
 
                             // Progressive reveal level based on distance to top edge:
                             let dx_to_anchor = rel_x - anchor_x;
@@ -305,8 +360,10 @@ pub fn start_proximity_detector(
                                     cursor_x: rel_x,
                                     cursor_y: rel_y,
                                     anchor_x,
-                                    offset_x,
+                                    offset_x: anchor_x,
+                                    monitor_width: mon_width,
                                     is_locked: is_anchor_locked.load(Ordering::Relaxed),
+                                    is_expanded: is_capsule_expanded.load(Ordering::Relaxed),
                                     contrast_mode: cached_contrast,
                                     active_tasks: cached_tasks.clone(),
                                 },
@@ -390,5 +447,72 @@ mod tests {
         // 2 active tasks: capsule expands to ~172px wide (half-width 86px)
         assert!(is_cursor_in_capsule(960.0 + 80.0, 20.0, anchor_x, 2));
         assert!(!is_cursor_in_capsule(960.0 + 95.0, 20.0, anchor_x, 2));
+    }
+
+    #[test]
+    fn test_expanded_capsule_geometry_center() {
+        let mon_width = 1920.0f32;
+        // 0 active tasks (collapsed width 92px -> 3.5x = 322px, half-width 161px)
+        let (left, right, center) = compute_expanded_bounds(960.0, 0, mon_width);
+        assert_eq!(center, 960.0);
+        assert_eq!(left, 960.0 - 161.0);
+        assert_eq!(right, 960.0 + 161.0);
+        assert_eq!(right - left, 322.0);
+    }
+
+    #[test]
+    fn test_expanded_capsule_geometry_left_corner() {
+        let mon_width = 1920.0f32;
+        // Anchor near left bezel: anchor_x = 50.0
+        let (left, right, center) = compute_expanded_bounds(50.0, 0, mon_width);
+        assert_eq!(left, SCREEN_MARGIN); // Pinned to left margin (10.0)
+        assert_eq!(right, 10.0 + 322.0); // 332.0
+        assert_eq!(center, (10.0 + 332.0) / 2.0); // 171.0
+        assert_eq!(right - left, 322.0);
+        assert!(left >= SCREEN_MARGIN);
+    }
+
+    #[test]
+    fn test_expanded_capsule_geometry_right_corner() {
+        let mon_width = 1920.0f32;
+        // Anchor near right bezel: anchor_x = 1890.0
+        let (left, right, center) = compute_expanded_bounds(1890.0, 0, mon_width);
+        assert_eq!(right, mon_width - SCREEN_MARGIN); // 1910.0
+        assert_eq!(left, 1910.0 - 322.0); // 1588.0
+        assert_eq!(center, (1588.0 + 1910.0) / 2.0);
+        assert_eq!(right - left, 322.0);
+        assert!(right <= mon_width - SCREEN_MARGIN);
+    }
+
+    #[test]
+    fn test_expanded_capsule_factor_3_5() {
+        let mon_width = 1920.0f32;
+        // 1 active task (collapsed = 136px -> 3.5x = 476px)
+        let (left, right, _) = compute_expanded_bounds(960.0, 1, mon_width);
+        assert_eq!(right - left, 476.0);
+
+        // 2 active tasks (collapsed = 172px -> 3.5x = 602px)
+        let (left, right, _) = compute_expanded_bounds(960.0, 2, mon_width);
+        assert_eq!(right - left, 602.0);
+
+        // 3 active tasks (collapsed = 208px -> 3.5x = 728px)
+        let (left, right, _) = compute_expanded_bounds(960.0, 3, mon_width);
+        assert_eq!(right - left, 728.0);
+    }
+
+    #[test]
+    fn test_expanded_hit_test_boundaries() {
+        let (left, right, _) = compute_expanded_bounds(960.0, 0, 1920.0);
+        // Inside expanded bounds
+        assert!(is_cursor_in_expanded_capsule(960.0, 20.0, left, right));
+        assert!(is_cursor_in_expanded_capsule(left, 20.0, left, right));
+        assert!(is_cursor_in_expanded_capsule(right, 20.0, left, right));
+
+        // Outside expanded bounds (horizontal)
+        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 20.0, left, right));
+        assert!(!is_cursor_in_expanded_capsule(right + 10.0, 20.0, left, right));
+
+        // Outside expanded bounds (vertical)
+        assert!(!is_cursor_in_expanded_capsule(960.0, 50.0, left, right));
     }
 }
