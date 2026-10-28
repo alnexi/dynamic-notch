@@ -34,6 +34,21 @@ fn get_active_tasks(state: tauri::State<TaskManager>) -> Vec<ActiveTask> {
     state.get_active_tasks()
 }
 
+#[tauri::command]
+fn media_play_pause() -> bool {
+    media::media_play_pause()
+}
+
+#[tauri::command]
+fn media_next() -> bool {
+    media::media_next()
+}
+
+#[tauri::command]
+fn media_previous() -> bool {
+    media::media_previous()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let task_manager = TaskManager::new();
@@ -46,7 +61,10 @@ pub fn run() {
             cancel_timer,
             set_alarm,
             cancel_alarm,
-            get_active_tasks
+            get_active_tasks,
+            media_play_pause,
+            media_next,
+            media_previous
         ])
         .setup(move |app| {
             println!("[NovaIsland] Setting up main window...");
@@ -61,7 +79,7 @@ pub fn run() {
                     let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
                     let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
                         monitor_size.width,
-                        (56.0 * scale).round() as u32,
+                        (88.0 * scale).round() as u32,
                     )));
                 }
 
@@ -78,6 +96,11 @@ pub fn run() {
                 let collapse_listener = Arc::clone(&is_capsule_expanded);
                 let unlock_collapse = Arc::clone(&is_capsule_expanded);
 
+                let is_media_mode = Arc::new(AtomicBool::new(false));
+                let media_mode_expand = Arc::clone(&is_media_mode);
+                let media_mode_collapse = Arc::clone(&is_media_mode);
+                let media_mode_unlock = Arc::clone(&is_media_mode);
+
                 window.listen("nova-lock-anchor", move |_| {
                     println!("[NovaIsland] Anchor locked by frontend.");
                     lock_listener.store(true, Ordering::Relaxed);
@@ -87,16 +110,21 @@ pub fn run() {
                     println!("[NovaIsland] Anchor unlocked by frontend.");
                     unlock_listener.store(false, Ordering::Relaxed);
                     unlock_collapse.store(false, Ordering::Relaxed);
+                    media_mode_unlock.store(false, Ordering::Relaxed);
                 });
 
-                window.listen("nova-expand-capsule", move |_| {
+                window.listen("nova-expand-capsule", move |event| {
                     println!("[NovaIsland] Capsule expanded by frontend.");
                     expand_listener.store(true, Ordering::Relaxed);
+                    let payload_str = event.payload();
+                    let is_media = payload_str.contains("\"mode\":\"media\"");
+                    media_mode_expand.store(is_media, Ordering::Relaxed);
                 });
 
                 window.listen("nova-collapse-capsule", move |_| {
                     println!("[NovaIsland] Capsule collapsed by frontend.");
                     collapse_listener.store(false, Ordering::Relaxed);
+                    media_mode_collapse.store(false, Ordering::Relaxed);
                 });
 
                 // Ensure clean thread shutdown when window closes
@@ -112,6 +140,7 @@ pub fn run() {
                     is_running,
                     Arc::clone(&is_anchor_locked),
                     Arc::clone(&is_capsule_expanded),
+                    Arc::clone(&is_media_mode),
                     task_manager,
                     ProximityConfig::default(),
                 );

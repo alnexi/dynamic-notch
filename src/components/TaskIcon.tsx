@@ -2,13 +2,19 @@ import { ActiveTask } from "../types/tasks";
 
 interface TaskIconProps {
   task: ActiveTask;
+  onClick?: (e: React.MouseEvent) => void;
 }
 
-export function TaskIcon({ task }: TaskIconProps) {
+export function TaskIcon({ task, onClick }: TaskIconProps) {
+  const isClickable = !!onClick;
   // 1. Artwork / cover image takes highest precedence
   if (task.icon_base64) {
     return (
-      <div className="task-icon-wrapper" title={`${task.title} — ${task.subtitle || ""}`}>
+      <div
+        className={`task-icon-wrapper ${isClickable ? "is-clickable" : ""}`}
+        title={`${task.title} — ${task.subtitle || ""}`}
+        onClick={onClick}
+      >
         <img
           src={task.icon_base64}
           alt={task.title}
@@ -24,8 +30,9 @@ export function TaskIcon({ task }: TaskIconProps) {
 
   return (
     <div
-      className={`task-icon-wrapper task-kind-${task.kind}`}
+      className={`task-icon-wrapper task-kind-${task.kind} ${isClickable ? "is-clickable" : ""}`}
       title={`${task.title}${task.subtitle ? ` (${task.subtitle})` : ""}`}
+      onClick={onClick}
     >
       {renderIconSvg(task.kind, nameLower)}
     </div>

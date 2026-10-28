@@ -1,22 +1,46 @@
-import { ActiveTask, ContrastMode } from "../types/tasks";
+import { ActiveTask, ContrastMode, ExpansionMode } from "../types/tasks";
 import { Clock } from "./Clock";
 import { TaskIcon } from "./TaskIcon";
+import { MediaIsland } from "./MediaIsland";
 
 interface SmartCapsuleProps {
   activeTasks: ActiveTask[];
   contrastMode: ContrastMode;
+  expansionMode?: ExpansionMode;
+  onMediaClick?: (e: React.MouseEvent) => void;
 }
 
-export function SmartCapsule({ activeTasks, contrastMode }: SmartCapsuleProps) {
+export function SmartCapsule({
+  activeTasks,
+  contrastMode,
+  expansionMode = "none",
+  onMediaClick,
+}: SmartCapsuleProps) {
+  const mediaTask = activeTasks.find((t) => t.kind === "media");
   const leftTasks = activeTasks.filter((t) => t.slot === "left");
   const rightTasks = activeTasks.filter((t) => t.slot === "right");
+
+  // Render the dedicated Dynamic Media Island when expanded in media mode
+  if (expansionMode === "media" && mediaTask) {
+    return (
+      <MediaIsland
+        mediaTask={mediaTask}
+        rightTasks={rightTasks}
+        contrastMode={contrastMode}
+      />
+    );
+  }
 
   return (
     <div className={`capsule-smart-layout contrast-${contrastMode}`}>
       {/* Left Slot: Primary indicators such as media playback cover/icon */}
       <div className="capsule-slot slot-left">
         {leftTasks.map((task) => (
-          <TaskIcon key={task.id} task={task} />
+          <TaskIcon
+            key={task.id}
+            task={task}
+            onClick={task.kind === "media" ? onMediaClick : undefined}
+          />
         ))}
       </div>
 

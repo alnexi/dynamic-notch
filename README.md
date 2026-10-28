@@ -2,7 +2,7 @@
 
 Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
-**Current Version:** `0.3.0`  
+**Current Version:** `0.4.0`  
 **Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---
@@ -61,15 +61,24 @@ Nova Island is under active phased development.
   - **Synchronized Native Window**:
     - Sized to primary monitor width (`monitor_size.width`), eliminating OS repositioning jitter and boundary clipping.
     - Hit-testing dynamically covers the full expanded footprint while preserving 100% click-through outside.
+- **Phase 6: Dynamic Media Island (v0.4.0)**
+  - **Interactive Media Island Experience**: Clicking the left-side media icon expands the capsule into a dedicated media player layout originating visually from the media indicator.
+  - **Clean Left-to-Right Architecture**:
+    1. **Large Album Artwork**: $48 \times 48\text{ px}$ high-resolution artwork occupying the full vertical height with 6px inset spacing within the $60\text{ px}$ tall capsule.
+    2. **Track Info & Real Playback Controls**: Located immediately to the right of the artwork (never beneath). Displays track title, artist, scrub progress bar with elapsed and total duration timestamps, and previous / play-pause / next buttons.
+    3. **Subtle Hairline Divider**: Refined vertical divider separating the media section from system status.
+    4. **Dedicated Right Section**: Vertically centered clock and active secondary task indicators (timers, alarms).
+  - **Concentric Outer Curvature**: Inner artwork corners match outer capsule curvature ($R_{\text{concentric}} \approx 22\text{ px}$ within $R_{\text{capsule}} = 30\text{ px}$), cleanly clipped without pixel overflows, square edges, or gaps.
+  - **Real Windows GSMTC Controls**: Dispatches real WinRT playback commands (`media_play_pause`, `media_next`, `media_previous`) via native Tauri IPC handlers.
+  - **Accurate Playback State**: Preserves media indicator and controls when paused without disappearing or falsely assuming paused equals stopped.
+  - **Preserved Transparency & Desktop Click-Through**: 100% transparent glass material maintained across compact and media states; hit-testing dynamically accounts for $400\text{ px} \times 60\text{ px}$ media mode bounds, allowing desktop clicks to pass through freely outside.
 
 ### Planned Features (Future Phases)
 
-- **Phase 6+: Expanded Dynamic Island Controls**
-  - Expanded interactive media controls overlay (play/pause, skip, scrub bar).
-  - System status indicators (battery, volume level, brightness).
-  - Compact notification and timer toasts.
-  - User configuration and customization settings.
-  - Multi-monitor support and Windows startup integration.
+- System status indicators (battery, volume level, brightness).
+- Compact notification and timer toasts.
+- User configuration and customization settings.
+- Multi-monitor support and Windows startup integration.
 
 ---
 

@@ -13,6 +13,41 @@ pub struct MediaSessionInfo {
     pub source_app: String,
     pub playback_status: String,
     pub thumbnail_base64: Option<String>,
+    pub position_seconds: Option<f64>,
+    pub duration_seconds: Option<f64>,
+}
+
+pub fn media_play_pause() -> bool {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return false; };
+    let Ok(manager) = async_op.join() else { return false; };
+    let Ok(session) = manager.GetCurrentSession() else { return false; };
+    if let Ok(op) = session.TryTogglePlayPauseAsync() {
+        op.join().unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+pub fn media_next() -> bool {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return false; };
+    let Ok(manager) = async_op.join() else { return false; };
+    let Ok(session) = manager.GetCurrentSession() else { return false; };
+    if let Ok(op) = session.TrySkipNextAsync() {
+        op.join().unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+pub fn media_previous() -> bool {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return false; };
+    let Ok(manager) = async_op.join() else { return false; };
+    let Ok(session) = manager.GetCurrentSession() else { return false; };
+    if let Ok(op) = session.TrySkipPreviousAsync() {
+        op.join().unwrap_or(false)
+    } else {
+        false
+    }
 }
 
 const B64_CHARS: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -62,6 +97,23 @@ pub fn get_current_media_session() -> Option<MediaSessionInfo> {
     let mut title = String::new();
     let mut artist = String::new();
     let mut thumbnail_base64 = None;
+    let mut position_seconds = None;
+    let mut duration_seconds = None;
+
+    if let Ok(timeline) = session.GetTimelineProperties() {
+        if let Ok(pos) = timeline.Position() {
+            let sec = pos.Duration as f64 / 10_000_000.0;
+            if sec >= 0.0 {
+                position_seconds = Some(sec);
+            }
+        }
+        if let Ok(end) = timeline.EndTime() {
+            let sec = end.Duration as f64 / 10_000_000.0;
+            if sec > 0.0 {
+                duration_seconds = Some(sec);
+            }
+        }
+    }
 
     if let Ok(async_props) = session.TryGetMediaPropertiesAsync() {
         if let Ok(props) = async_props.join() {
@@ -104,5 +156,7 @@ pub fn get_current_media_session() -> Option<MediaSessionInfo> {
         source_app,
         playback_status: status_str.to_string(),
         thumbnail_base64,
+        position_seconds,
+        duration_seconds,
     })
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import "./App.css";
-import { ActiveTask, ContrastMode, ProximityLevel, ProximityPayload } from "./types/tasks";
+import { ActiveTask, ContrastMode, ExpansionMode, ProximityLevel, ProximityPayload } from "./types/tasks";
 import { SmartCapsule } from "./components/SmartCapsule";
 import { computeCapsuleGeometry } from "./utils/geometry";
 
@@ -9,6 +9,7 @@ function App() {
   const [offsetX, setOffsetX] = useState<number>(120);
   const [isActivated, setIsActivated] = useState<boolean>(false);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [expansionMode, setExpansionMode] = useState<ExpansionMode>("none");
   const [monitorWidth, setMonitorWidth] = useState<number>(() => {
     return typeof window !== "undefined" ? window.innerWidth || 1920 : 1920;
   });
@@ -39,11 +40,11 @@ function App() {
     }
   }, []);
 
-  const emitExpand = useCallback(async () => {
+  const emitExpand = useCallback(async (mode: ExpansionMode = "standard") => {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
       try {
         const { emit } = await import("@tauri-apps/api/event");
-        await emit("nova-expand-capsule", { expanded: true });
+        await emit("nova-expand-capsule", { expanded: true, mode });
       } catch (err) {
         console.warn("Failed to emit nova-expand-capsule:", err);
       }
@@ -91,18 +92,21 @@ function App() {
               }
               if (p.is_expanded !== undefined && !p.is_expanded && isExpanded) {
                 setIsExpanded(false);
+                setExpansionMode("none");
               }
               if (p.level === "hovered" || p.is_locked) {
                 setIsActivated(true);
               } else if (p.level === "idle") {
                 setIsActivated(false);
                 setIsExpanded(false);
+                setExpansionMode("none");
               }
             }
           });
 
           unlistenCollapse = await listen("nova-collapse", () => {
             setIsExpanded(false);
+            setExpansionMode("none");
           });
         } catch (err) {
           console.warn("Unable to subscribe to native events:", err);
@@ -138,6 +142,7 @@ function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsExpanded(false);
+        setExpansionMode("none");
         setIsActivated(false);
         setProximity("idle");
         emitCollapse();
@@ -147,6 +152,7 @@ function App() {
 
     const handleBlur = () => {
       setIsExpanded(false);
+      setExpansionMode("none");
       setIsActivated(false);
       emitCollapse();
       emitUnlock();
@@ -170,6 +176,7 @@ function App() {
     if (isExpanded) {
       // Smooth automatic collapse on mouse leave without requiring another click
       setIsExpanded(false);
+      setExpansionMode("none");
       isCollapsingRef.current = true;
       setTimeout(() => {
         isCollapsingRef.current = false;
@@ -181,15 +188,28 @@ function App() {
     }
   };
 
+  // Expand into full Dynamic Media Island layout when media icon is clicked
+  const handleMediaClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      if (isCollapsingRef.current) return;
+      setIsExpanded(true);
+      setExpansionMode("media");
+      emitExpand("media");
+    },
+    [emitExpand]
+  );
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     // Prevent accidental re-expansion during collapse transition
     if (isCollapsingRef.current) return;
 
-    // Expand on click: Clicking the small capsule expands it to ~3.5x collapsed width
+    // Expand on click: Clicking the small capsule expands it to standard ~3.5x collapsed width
     if (!isExpanded && (isActivated || proximity === "hovered")) {
       setIsExpanded(true);
-      emitExpand();
+      setExpansionMode("standard");
+      emitExpand("standard");
     }
   };
 
@@ -216,7 +236,8 @@ function App() {
     offsetX,
     activeTasks.length,
     isExpanded,
-    monitorWidth
+    monitorWidth,
+    expansionMode
   );
 
   return (
@@ -226,22 +247,24 @@ function App() {
       style={{
         "--bubble-offset": `${geometry.centerX}px`,
         "--capsule-width": `${geometry.width}px`,
+        "--capsule-height": `${geometry.height}px`,
       } as React.CSSProperties}
     >
       {/* 
-        Nova Island — Smooth Smart Capsule Expansion (v0.3.0):
+        Nova Island — Dynamic Media Island Implementation (v0.4.0):
         - Idle: 100% invisible, click-through everywhere.
         - Approaching: subtle curved glass protrusion.
         - Hovered (Collapsed): compact capsule with centered clock + active tasks.
-        - Clicked (Expanded): expands horizontally to ~3.5x collapsed width.
-        - Symmetrical when room permits; edge-favored near left/right screen corners.
+        - Clicked on Media Icon: expands into Dynamic Media Island layout with 48x48 rounded artwork,
+          track title, artist, playback progress, and real controls to the right, plus clock on far right.
+        - Clicked on Body: expands standard horizontally ~3.5x width.
         - Mouse leave: smooth upward retraction back to collapsed/idle state.
         - Fully transparent glass preserved across all states.
       */}
       <div
         className={`glass-bubble state-${effectiveState} ${taskCountClass} contrast-${contrastMode} ${
           isExpanded ? "is-expanded" : ""
-        }`}
+        } mode-${expansionMode}`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
@@ -253,7 +276,12 @@ function App() {
 
         {/* Content rendered when in expanded or compact hovered state */}
         {effectiveState === "hovered" && (
-          <SmartCapsule activeTasks={activeTasks} contrastMode={contrastMode} />
+          <SmartCapsule
+            activeTasks={activeTasks}
+            contrastMode={contrastMode}
+            expansionMode={expansionMode}
+            onMediaClick={handleMediaClick}
+          />
         )}
       </div>
     </div>

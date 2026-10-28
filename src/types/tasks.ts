@@ -1,6 +1,7 @@
 export type TaskKind = "media" | "timer" | "alarm" | "custom";
 export type TaskSlot = "left" | "right";
 export type ContrastMode = "dark-bg" | "light-bg";
+export type ExpansionMode = "none" | "standard" | "media";
 
 export interface ActiveTask {
   id: string;
@@ -12,6 +13,9 @@ export interface ActiveTask {
   icon_name: string;
   progress?: number;
   remaining_seconds?: number;
+  is_playing?: boolean;
+  position_seconds?: number;
+  duration_seconds?: number;
 }
 
 export type ProximityLevel = "idle" | "approaching" | "near" | "hovered";
@@ -24,6 +28,7 @@ export interface ProximityPayload {
   offset_x: number;
   is_locked: boolean;
   is_expanded?: boolean;
+  expansion_mode?: ExpansionMode;
   monitor_width?: number;
   contrast_mode?: ContrastMode;
   active_tasks?: ActiveTask[];

@@ -31,6 +31,9 @@ pub struct ActiveTask {
     pub icon_name: String,
     pub progress: Option<f32>,
     pub remaining_seconds: Option<u64>,
+    pub is_playing: Option<bool>,
+    pub position_seconds: Option<f64>,
+    pub duration_seconds: Option<f64>,
 }
 
 #[derive(Debug, Clone)]
@@ -120,7 +123,16 @@ impl TaskManager {
 
         // 1. Query real Windows Media Playback Status
         if let Some(media) = get_current_media_session() {
-            if media.is_playing {
+            if media.is_playing || (!media.title.is_empty() && media.playback_status == "paused") {
+                let progress = match (media.position_seconds, media.duration_seconds) {
+                    (Some(pos), Some(dur)) if dur > 0.0 => Some((pos / dur).clamp(0.0, 1.0) as f32),
+                    _ => None,
+                };
+                let remaining_seconds = match (media.position_seconds, media.duration_seconds) {
+                    (Some(pos), Some(dur)) if dur >= pos => Some((dur - pos) as u64),
+                    _ => None,
+                };
+
                 active.push(ActiveTask {
                     id: "system_media".to_string(),
                     kind: TaskKind::Media,
@@ -141,8 +153,11 @@ impl TaskManager {
                     } else {
                         "media".to_string()
                     },
-                    progress: None,
-                    remaining_seconds: None,
+                    progress,
+                    remaining_seconds,
+                    is_playing: Some(media.is_playing),
+                    position_seconds: media.position_seconds,
+                    duration_seconds: media.duration_seconds,
                 });
             }
         }
@@ -171,6 +186,9 @@ impl TaskManager {
                     icon_name: "timer".to_string(),
                     progress: Some(progress),
                     remaining_seconds: Some(remaining),
+                    is_playing: None,
+                    position_seconds: None,
+                    duration_seconds: None,
                 });
             }
         }
@@ -188,6 +206,9 @@ impl TaskManager {
                     icon_name: "alarm".to_string(),
                     progress: None,
                     remaining_seconds: None,
+                    is_playing: None,
+                    position_seconds: None,
+                    duration_seconds: None,
                 });
             }
         }

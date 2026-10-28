@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.0] - 2026-10-28
+
+### Summary
+Implemented the integrated Dynamic Media Island experience inside the existing transparent capsule. Clicking the left-side media icon expands the capsule into an Apple-inspired media layout featuring large 48x48px album artwork with concentric curvature matching the capsule's outer radius, track title and artist, playback progress bar with live duration labels, real Windows GSMTC playback controls (Previous, Play/Pause, Next) via Tauri IPC, subtle hairline divider, and dedicated right-side section with vertically centered clock and status indicators—all strictly preserving full glass transparency and native desktop click-through.
+
+### Added
+- **Integrated Dynamic Media Island Layout (`src/components/MediaIsland.tsx`, `src/App.css`)**:
+  - **Left-to-Right Flow**:
+    1. **Large Album Artwork**: $48 \times 48\text{px}$ artwork on the left, occupying the full intended vertical height with consistent 6px inset spacing within the 60px capsule.
+    2. **Track Info & Playback Controls**: Dedicated section strictly to the **RIGHT** of the album artwork (never placed beneath). Displays track title, artist/source, progress bar with elapsed and total duration, and playback control buttons.
+    3. **Subtle Hairline Divider**: Visual vertical separation between the media section and system status area.
+    4. **Dedicated Right Section**: Vertically centered clock and supported status indicators (timers, alarms).
+- **Concentric Artwork Curvature**:
+  - The artwork outer corner radius ($R_{\text{concentric}} \approx 22\text{px}$) visually mirrors the capsule's outer boundary curvature ($R_{\text{outer}} = 30\text{px}$ minus $6\text{px}$ inset), clipping cleanly with zero overflow, square corners, or transparent gaps.
+- **Real Windows GSMTC Playback Controls (`src-tauri/src/media.rs`, `src-tauri/src/lib.rs`)**:
+  - Added native WinRT `TryTogglePlayPauseAsync()`, `TrySkipNextAsync()`, and `TrySkipPreviousAsync()` implementations.
+  - Exposed `media_play_pause`, `media_next`, and `media_previous` Tauri IPC commands.
+  - Extracted playback timeline properties (`GetTimelineProperties()`) providing position and duration in seconds.
+  - Accurately tracks both actively playing and paused media sessions, preserving the media indicator and controls without vanishing when playback is paused.
+- **Intelligent Motion & Dynamic Hit-Testing (`src-tauri/src/proximity.rs`, `src/utils/geometry.ts`)**:
+  - Smooth expansion from the left-side media icon to a $400\text{px} \times 60\text{px}$ capsule with coordinated height, width, and border-radius transitions.
+  - Native window height adjusted to 88px in `tauri.conf.json` and `lib.rs` to comfortably host the expanded 60px media capsule with drop shadows and blur without clipping.
+  - Dynamic hit-test calculation for media mode (`is_media_mode: Arc<AtomicBool>`, `MEDIA_EXPANDED_WIDTH = 400.0`, `max_y = 68.0`) maintaining 100% desktop click-through outside the expanded bounds.
+  - Smooth upward retraction back to compact state upon mouse leave.
+- **Unit Test Suite Expansion**:
+  - Added unit tests for media mode expanded bounds at screen center, left corner, right corner, and media hit-test boundary checks (15 tests passing).
+
+### Changed
+- Bumped semantic version to `0.4.0` across `package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json`.
+
+---
+
 ## [0.3.0] - 2026-10-27
 
 ### Summary
