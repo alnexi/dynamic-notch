@@ -220,9 +220,10 @@ export function MediaIsland({
       </div>
 
       {/* 
-        1. Large Album Artwork on the Left:
-        - Occupies 48x48px area, vertically centered.
-        - Controlled rounded-rectangle corners (--media-artwork-radius: 10px) visually matching capsule curvature.
+        1. Responsive Album Artwork on the Left (v0.6.1):
+        - Scales proportionally with capsule height (H - 2 * 6px) with equal 6px top, bottom, and left margins.
+        - Preserves strict 1:1 square aspect ratio and vertical centering.
+        - Concentric rounded-rectangle corners (--media-artwork-radius) matching capsule curvature.
         - Graceful fallback with zero broken image artifacts on load error.
       */}
       <div className="media-artwork-container">

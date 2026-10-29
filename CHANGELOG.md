@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.1] - 2026-10-29
+
+### Summary
+Implemented responsive album artwork sizing for Nova Island Media Island. Fixed the issue where album artwork remained fixed at 48×48px when the capsule expanded vertically. The artwork now scales proportionally with the actual capsule height ($H - 2P$), maintaining visually balanced and strictly equal 6px spacing across top, bottom, and left edges, preserving a 1:1 square aspect ratio and concentric corner curvature without distortion or resize loops.
+
+### Fixed
+- **Responsive Artwork Dimensions (`src/App.css`, `src/utils/geometry.ts`, `src/App.tsx`)**:
+  - Replaced the fixed 48×48px artwork size with responsive scaling derived directly from capsule height: $S_{\text{art}} = \max(48, H_{\text{capsule}} - 2 \cdot \text{INSET})$.
+  - Base capsule height (60px) maintains the standard 48×48px size ($60 - 12\text{px}$); wrapped capsule height (74px) scales artwork to 62×62px; tall capsule height (88px) scales artwork to 76×76px; extra-tall heights scale accordingly.
+  - Balanced insets: Top, bottom, and left margins remain identical at 6px throughout all heights, keeping the artwork vertically centered and aligned with the capsule's glass contour.
+  - Preserved square aspect ratio (`aspect-ratio: 1 / 1; object-fit: cover`) with zero distortion.
+- **Concentric Corner Curvature Scaling (`src/utils/geometry.ts`, `src/App.css`)**:
+  - Artwork corner radius scales concentrically ($R_{\text{art}} = \text{round}(\min(16, \max(10, S_{\text{art}} \cdot 0.208)))$):
+    - 48px artwork $\to$ 10px radius (preserving approved v0.4.1 curvature).
+    - 62px artwork $\to$ 13px radius.
+    - 76px artwork $\to$ 16px radius.
+  - Smooth animation transitions on `width`, `height`, `min-width`, `min-height`, and `border-radius` using `0.35s cubic-bezier(0.16, 1, 0.3, 1)` matching the capsule's motion.
+- **Proportional Fallback Icon Sizing (`src/App.css`)**:
+  - Scaled the fallback musical note icon proportionally (`width: 46%; height: 46%`) to eliminate the shrunken icon appearance on taller artwork containers.
+- **Structural Width Integration (`src/utils/geometry.ts`)**:
+  - Updated `structuralWidth` in `geometry.ts` to include responsive artwork width, ensuring title, controls, progress bar, and clock retain their full allocated width without text clipping.
+
+---
+
 ## [0.6.0] - 2026-10-29
 
 ### Summary

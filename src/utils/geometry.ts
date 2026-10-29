@@ -21,6 +21,35 @@ export const COLLAPSED_HEIGHT = 34;
 export const COLLAPSED_RADIUS = 17;
 
 /**
+ * Standard vertical and left inset for the album artwork inside the media capsule.
+ * With H = 60px, artwork size is 60 - 2 * 6 = 48px.
+ * When the capsule grows taller (e.g. 74px, 88px, 96px), the artwork scales responsively (H - 2 * 6px),
+ * maintaining perfectly balanced, equal top, bottom, and left spacing.
+ */
+export const MEDIA_VERTICAL_INSET = 6;
+export const MEDIA_MIN_ARTWORK_SIZE = 48;
+
+/**
+ * Derives the responsive album artwork size from the capsule height:
+ * - Square aspect ratio is preserved.
+ * - Top and bottom insets remain exactly equal (MEDIA_VERTICAL_INSET = 6px).
+ * - Minimum size is 48px (base 60px capsule height).
+ */
+export function getArtworkSize(capsuleHeight: number): number {
+  return Math.max(MEDIA_MIN_ARTWORK_SIZE, Math.round(capsuleHeight - 2 * MEDIA_VERTICAL_INSET));
+}
+
+/**
+ * Derives the proportional album artwork corner curvature:
+ * - Base 48px artwork -> 10px radius (matching the approved v0.4.1/v0.5.0/v0.6.0 standard).
+ * - Scales smoothly and concentrically as the artwork grows (e.g. 62px -> 13px, 76px -> 16px).
+ * - Strictly avoids sharp right angles and over-rounded circular pill distortions.
+ */
+export function getArtworkRadius(artworkSize: number): number {
+  return Math.round(Math.min(16, Math.max(10, artworkSize * 0.208)));
+}
+
+/**
  * Screen bezel safety margin in CSS pixels to prevent the capsule from clipping
  * or bleeding off the monitor edge.
  */
@@ -70,6 +99,8 @@ export interface CapsuleGeometry {
   centerX: number;
   left: number;
   right: number;
+  artworkSize: number;
+  artworkRadius: number;
 }
 
 let measurementCanvas: HTMLCanvasElement | null = null;
@@ -100,7 +131,8 @@ export function measureTextWidth(text: string, font: string, charFallbackRatio: 
 /**
  * Computes content-adaptive dimensions for the expanded Media Island:
  * - Uses true rendered DOM measurements when available; falls back to high-fidelity font metrics.
- * - Accounts for 48x48 artwork, unconstrained title width, artist width, controls row, progress track, clock, dividers, and padding.
+ * - Responsive album artwork sizing: derives artwork dimensions (H - 2 * 6px) and concentric corner curvature
+ *   directly from the rendered capsule height.
  * - Short titles: compact, proportionate width (~280px-320px).
  * - Normal titles: appropriately scaled width (~340px-440px).
  * - Long titles: expands width dynamically (600px, 700px, 800px+) without premature arbitrary 560px capping,
@@ -113,23 +145,45 @@ export function measureTextWidth(text: string, font: string, charFallbackRatio: 
 export function computeMediaDimensions(
   mediaInput: MediaMetadataInput | undefined,
   safeMonWidth: number
-): { width: number; height: number; radius: number; titleLines: number } {
+): {
+  width: number;
+  height: number;
+  radius: number;
+  titleLines: number;
+  artworkSize: number;
+  artworkRadius: number;
+} {
   const title = mediaInput?.title || "";
   const artist = mediaInput?.artist || "";
   const hasDuration = mediaInput?.hasDuration ?? false;
   const rightTasksCount = mediaInput?.rightTasksCount ?? 0;
   const measured = mediaInput?.measured;
 
-  // Structural overhead:
-  // Left pad (6) + Artwork (48) + Gap (10) + Controls padding (12) +
-  // Gap (10) + Divider (1) + Divider margins (4) + Gap (10) +
-  // Clock & Secondary tasks (measured or calculated) + Right pad (10)
+  // Determine initial target height:
+  // - If measuredControlsHeight is available from rendered DOM, derive height from content stack + padding (14px).
+  // - Otherwise, start with MEDIA_BASE_HEIGHT (60px).
+  let targetHeight = MEDIA_BASE_HEIGHT;
+  if (typeof measured?.measuredControlsHeight === "number" && measured.measuredControlsHeight > 0) {
+    const neededFromContent = Math.round(measured.measuredControlsHeight + 14);
+    targetHeight = Math.max(MEDIA_BASE_HEIGHT, neededFromContent);
+  }
+
+  // Responsive artwork sizing derived directly from capsule height:
+  // Artwork is square (aspect-ratio 1:1), vertically centered, with equal 6px top, bottom, and left margins.
+  let artworkSize = getArtworkSize(targetHeight);
+  let artworkRadius = getArtworkRadius(artworkSize);
+
+  // Clock & Secondary tasks (measured or calculated)
   const measuredRight = measured?.measuredRightWidth;
   const rightSectionWidth = typeof measuredRight === "number" && measuredRight > 0
     ? measuredRight
     : 46 + rightTasksCount * 22;
 
-  const structuralWidth = 6 + 48 + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
+  // Structural overhead:
+  // Left pad (6) + Artwork (artworkSize) + Gap (10) + Controls padding (12) +
+  // Gap (10) + Divider (1) + Divider margins (4) + Gap (10) +
+  // Clock & Secondary tasks + Right pad (10)
+  let structuralWidth = MEDIA_VERTICAL_INSET + artworkSize + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
 
   // Natural unconstrained text widths: prefer DOM measured widths when available
   const titleWidth = typeof measured?.naturalTitleWidth === "number" && measured.naturalTitleWidth > 0
@@ -168,7 +222,6 @@ export function computeMediaDimensions(
   const availableTextWidth = targetWidth - structuralWidth - 12;
   const titleNeedsWrapping = titleWidth > availableTextWidth;
 
-  let targetHeight = MEDIA_BASE_HEIGHT;
   let titleLines = 1;
 
   if (titleNeedsWrapping) {
@@ -183,22 +236,13 @@ export function computeMediaDimensions(
     } else {
       titleLines = titleWidth > availableTextWidth * 1.85 ? 3 : 2;
     }
-  }
 
-  // True Content-Adaptive Height:
-  // If DOM measuredControlsHeight is available, calculate height directly from content stack:
-  // content stack + top/bottom capsule padding (14px)
-  if (typeof measured?.measuredControlsHeight === "number" && measured.measuredControlsHeight > 0) {
-    const neededFromContent = Math.round(measured.measuredControlsHeight + 14);
-    targetHeight = Math.max(MEDIA_BASE_HEIGHT, neededFromContent);
-  } else {
-    // Fallback based on wrapped line count
-    if (titleLines === 3) {
-      targetHeight = 88;
-    } else if (titleLines === 2) {
-      targetHeight = 74;
-    } else {
-      targetHeight = MEDIA_BASE_HEIGHT;
+    // If DOM controls height was not measured yet, update height based on wrapping lines:
+    if (!measured?.measuredControlsHeight) {
+      targetHeight = titleLines === 3 ? 88 : 74;
+      artworkSize = getArtworkSize(targetHeight);
+      artworkRadius = getArtworkRadius(artworkSize);
+      structuralWidth = MEDIA_VERTICAL_INSET + artworkSize + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
     }
   }
 
@@ -214,6 +258,8 @@ export function computeMediaDimensions(
     height: targetHeight,
     radius,
     titleLines,
+    artworkSize,
+    artworkRadius,
   };
 }
 
@@ -223,7 +269,7 @@ export function computeMediaDimensions(
  * - Expanded state:
  *   - Standard mode: 3.5x collapsed width, 34px height, 17px radius.
  *   - Media mode: Content-adaptive width (no arbitrary 560px cap), content-adaptive height (no 74px cap),
- *     proportional rounded-rectangle radius (20px-26px).
+ *     responsive album artwork sizing (H - 2 * 6px), proportional rounded-rectangle radius (20px-26px).
  *   - Symmetrical around anchorX when sufficient room exists on both sides.
  *   - Near left corner: pins to left margin and expands rightward, strictly avoiding clipping.
  *   - Near right corner: pins to right margin and expands leftward, strictly avoiding clipping.
@@ -255,6 +301,8 @@ export function computeCapsuleGeometry(
       centerX: clampedCenter,
       left: clampedCenter - halfW,
       right: clampedCenter + halfW,
+      artworkSize: 22,
+      artworkRadius: 11,
     };
   }
 
@@ -263,6 +311,8 @@ export function computeCapsuleGeometry(
   let targetHeight: number;
   let radius: number;
   let titleLines = 1;
+  let artworkSize: number;
+  let artworkRadius: number;
 
   if (expansionMode === "media") {
     const mediaDims = computeMediaDimensions(mediaInput, safeMonWidth);
@@ -270,6 +320,8 @@ export function computeCapsuleGeometry(
     targetHeight = mediaDims.height;
     radius = mediaDims.radius;
     titleLines = mediaDims.titleLines;
+    artworkSize = mediaDims.artworkSize;
+    artworkRadius = mediaDims.artworkRadius;
   } else {
     targetWidth = Math.min(
       Math.round(collapsedWidth * EXPANSION_FACTOR),
@@ -277,6 +329,8 @@ export function computeCapsuleGeometry(
     );
     targetHeight = COLLAPSED_HEIGHT;
     radius = COLLAPSED_RADIUS;
+    artworkSize = 22;
+    artworkRadius = 11;
   }
 
   const halfW = targetWidth / 2;
@@ -305,7 +359,7 @@ export function computeCapsuleGeometry(
     const rightSectionWidth = typeof measuredRight === "number" && measuredRight > 0
       ? measuredRight
       : 46 + (mediaInput?.rightTasksCount ?? 0) * 22;
-    const structuralWidth = 6 + 48 + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
+    const structuralWidth = MEDIA_VERTICAL_INSET + artworkSize + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
     const availableTextWidth = actualWidth - structuralWidth - 12;
 
     const titleWidth = typeof mediaInput?.measured?.naturalTitleWidth === "number" && mediaInput.measured.naturalTitleWidth > 0
@@ -320,6 +374,8 @@ export function computeCapsuleGeometry(
       titleLines = titleWidth > availableTextWidth * 1.85 ? 3 : 2;
       if (!mediaInput?.measured?.measuredControlsHeight) {
         targetHeight = titleLines === 3 ? 88 : 74;
+        artworkSize = getArtworkSize(targetHeight);
+        artworkRadius = getArtworkRadius(artworkSize);
         radius = Math.round(Math.min(26, Math.max(20, targetHeight * 0.28)));
       }
     }
@@ -333,5 +389,7 @@ export function computeCapsuleGeometry(
     centerX,
     left,
     right,
+    artworkSize,
+    artworkRadius,
   };
 }

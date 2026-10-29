@@ -315,6 +315,8 @@ function App() {
         "--capsule-height": `${geometry.height}px`,
         "--capsule-radius": `${geometry.radius}px`,
         "--media-title-lines": geometry.titleLines,
+        "--media-artwork-size": `${geometry.artworkSize}px`,
+        "--media-artwork-radius": `${geometry.artworkRadius}px`,
       } as React.CSSProperties}
     >
       {/* 
