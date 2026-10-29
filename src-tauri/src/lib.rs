@@ -5,7 +5,7 @@ mod tasks;
 
 use proximity::{start_proximity_detector, ProximityConfig};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tasks::{ActiveTask, TaskManager};
 use tauri::{Listener, Manager, PhysicalPosition, Position};
 
@@ -79,7 +79,7 @@ pub fn run() {
                     let _ = window.set_position(Position::Physical(PhysicalPosition { x, y }));
                     let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
                         monitor_size.width,
-                        (88.0 * scale).round() as u32,
+                        (100.0 * scale).round() as u32,
                     )));
                 }
 
@@ -101,6 +101,16 @@ pub fn run() {
                 let media_mode_collapse = Arc::clone(&is_media_mode);
                 let media_mode_unlock = Arc::clone(&is_media_mode);
 
+                // Content-adaptive dynamic expanded dimensions synchronized with frontend
+                let dynamic_expanded_width = Arc::new(Mutex::new(None::<f32>));
+                let dynamic_expanded_height = Arc::new(Mutex::new(None::<f32>));
+                let width_expand = Arc::clone(&dynamic_expanded_width);
+                let height_expand = Arc::clone(&dynamic_expanded_height);
+                let width_collapse = Arc::clone(&dynamic_expanded_width);
+                let height_collapse = Arc::clone(&dynamic_expanded_height);
+                let width_unlock = Arc::clone(&dynamic_expanded_width);
+                let height_unlock = Arc::clone(&dynamic_expanded_height);
+
                 window.listen("nova-lock-anchor", move |_| {
                     println!("[NovaIsland] Anchor locked by frontend.");
                     lock_listener.store(true, Ordering::Relaxed);
@@ -111,6 +121,12 @@ pub fn run() {
                     unlock_listener.store(false, Ordering::Relaxed);
                     unlock_collapse.store(false, Ordering::Relaxed);
                     media_mode_unlock.store(false, Ordering::Relaxed);
+                    if let Ok(mut lock) = width_unlock.lock() {
+                        *lock = None;
+                    }
+                    if let Ok(mut lock) = height_unlock.lock() {
+                        *lock = None;
+                    }
                 });
 
                 window.listen("nova-expand-capsule", move |event| {
@@ -119,12 +135,32 @@ pub fn run() {
                     let payload_str = event.payload();
                     let is_media = payload_str.contains("\"mode\":\"media\"");
                     media_mode_expand.store(is_media, Ordering::Relaxed);
+
+                    // Parse dynamic dimensions passed by frontend
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(payload_str) {
+                        if let Some(w) = val.get("width").and_then(|v| v.as_f64()) {
+                            if let Ok(mut lock) = width_expand.lock() {
+                                *lock = Some(w as f32);
+                            }
+                        }
+                        if let Some(h) = val.get("height").and_then(|v| v.as_f64()) {
+                            if let Ok(mut lock) = height_expand.lock() {
+                                *lock = Some(h as f32);
+                            }
+                        }
+                    }
                 });
 
                 window.listen("nova-collapse-capsule", move |_| {
                     println!("[NovaIsland] Capsule collapsed by frontend.");
                     collapse_listener.store(false, Ordering::Relaxed);
                     media_mode_collapse.store(false, Ordering::Relaxed);
+                    if let Ok(mut lock) = width_collapse.lock() {
+                        *lock = None;
+                    }
+                    if let Ok(mut lock) = height_collapse.lock() {
+                        *lock = None;
+                    }
                 });
 
                 // Ensure clean thread shutdown when window closes
@@ -141,6 +177,8 @@ pub fn run() {
                     Arc::clone(&is_anchor_locked),
                     Arc::clone(&is_capsule_expanded),
                     Arc::clone(&is_media_mode),
+                    Arc::clone(&dynamic_expanded_width),
+                    Arc::clone(&dynamic_expanded_height),
                     task_manager,
                     ProximityConfig::default(),
                 );

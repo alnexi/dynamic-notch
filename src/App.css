@@ -235,7 +235,7 @@ html, body, #root {
 .glass-bubble.state-hovered {
   width: var(--capsule-width, 92px);
   height: var(--capsule-height, 34px);
-  border-radius: calc(var(--capsule-height, 34px) / 2);
+  border-radius: var(--capsule-radius, 17px);
   transform: translateX(-50%) translateY(4px);
   opacity: 1;
   pointer-events: auto;
@@ -266,18 +266,22 @@ html, body, #root {
 }
 
 /* 
-  Expanded state on click (v0.3.0 & v0.4.0):
-  - Standard mode: Approximately 3.5x collapsed width (34px height)
-  - Media mode: 400px width x 60px height with 22px concentric curved artwork
+  Expanded state on click (v0.3.0 - v0.5.0):
+  - Standard mode: Approximately 3.5x collapsed width (34px height, 17px radius)
+  - Media mode: Content-adaptive width (280px-560px), height (60px-74px),
+    proportional rounded-rectangle corner radius (20px-24px, NOT an elongated pill)
   - Retains 100% transparent glass appearance, specular sheen, and contrast
 */
 .glass-bubble.state-hovered.is-expanded {
   width: var(--capsule-width, 322px);
+  border-radius: var(--capsule-radius, 20px);
   cursor: default;
 }
 
 .glass-bubble.state-hovered.is-expanded.mode-media {
-  width: var(--capsule-width, 400px);
+  width: var(--capsule-width, 360px);
+  height: var(--capsule-height, 60px);
+  border-radius: var(--capsule-radius, 20px);
 }
 
 .glass-bubble.state-hovered.is-expanded .glass-specular {
@@ -291,7 +295,7 @@ html, body, #root {
   left: 3%;
   right: 3%;
   height: 38%;
-  border-radius: 28px 28px 0 0;
+  border-radius: calc(var(--capsule-radius, 20px) - 2px) calc(var(--capsule-radius, 20px) - 2px) 0 0;
   opacity: 0.88;
 }
 
@@ -546,18 +550,20 @@ html, body, #root {
 }
 
 .media-title {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--media-title-lines, 1);
   width: 100%;
   max-width: 100%;
   min-width: 0;
   font-size: 11.5px;
   font-weight: 600;
-  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.25;
   letter-spacing: 0.2px;
   box-sizing: border-box;
+  word-break: break-word;
 }
 
 .media-artist {

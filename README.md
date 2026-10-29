@@ -2,7 +2,7 @@
 
 Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
-**Current Version:** `0.4.1`  
+**Current Version:** `0.5.0`  
 **Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---
@@ -68,10 +68,15 @@ Nova Island is under active phased development.
     2. **Track Info & Real Playback Controls**: Located immediately to the right of the artwork (never beneath). Displays track title, artist, scrub progress bar with elapsed and total duration timestamps, and previous / play-pause / next buttons.
     3. **Subtle Hairline Divider**: Refined vertical divider separating the media section from system status.
     4. **Dedicated Right Section**: Vertically centered clock and active secondary task indicators (timers, alarms).
-  - **Concentric Outer Curvature**: Inner artwork corners match outer capsule curvature ($R_{\text{concentric}} \approx 22\text{ px}$ within $R_{\text{capsule}} = 30\text{ px}$), cleanly clipped without pixel overflows, square edges, or gaps.
+  - **Concentric Outer Curvature**: Inner artwork corners match outer capsule curvature ($R_{\text{concentric}} \approx 10\text{ px}$ within rounded capsule), cleanly clipped without pixel overflows, square edges, or gaps.
   - **Real Windows GSMTC Controls**: Dispatches real WinRT playback commands (`media_play_pause`, `media_next`, `media_previous`) via native Tauri IPC handlers.
   - **Accurate Playback State**: Preserves media indicator and controls when paused without disappearing or falsely assuming paused equals stopped.
-  - **Preserved Transparency & Desktop Click-Through**: 100% transparent glass material maintained across compact and media states; hit-testing dynamically accounts for $400\text{ px} \times 60\text{ px}$ media mode bounds, allowing desktop clicks to pass through freely outside.
+  - **Preserved Transparency & Desktop Click-Through**: 100% transparent glass material maintained across compact and media states; hit-testing dynamically accounts for expanded bounds, allowing desktop clicks to pass through freely outside.
+- **Phase 7: Content-Adaptive Capsule Geometry (v0.5.0)**
+  - **Dynamic Dimension Calculation**: Calculates required capsule width ($280\text{ px}$ to $560\text{ px}$) and height ($60\text{ px}$ to $74\text{ px}$) from actual metadata (artwork, title length, artist, controls, progress track, clock, status icons). Short titles remain compact without inflating the capsule; longer titles expand gracefully.
+  - **Graceful Title Wrapping & Height Expansion**: When available horizontal space is constrained, titles wrap to 2 lines and the capsule expands vertically from $60\text{ px}$ to $74\text{ px}$ without clipping or control collision.
+  - **Content-Aware Rounded-Rectangle Curvature**: Replaced the oversized semicircular pill silhouette with a proportional $20\text{ px}-24\text{ px}$ rounded-rectangle corner radius in the expanded state, while preserving the $17\text{ px}$ pill radius in the collapsed state.
+  - **Synchronized Native Hit-Testing & Window Geometry**: Tauri window height expanded to $100\text{ px}$; dynamic width/height IPC events synchronize Win32 hit-testing and auto-collapse thresholds with the rendered capsule.
 
 ### Planned Features (Future Phases)
 

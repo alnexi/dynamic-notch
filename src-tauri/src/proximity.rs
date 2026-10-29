@@ -1,7 +1,7 @@
 use crate::contrast::{get_adaptive_contrast_mode, ContrastMode};
 use crate::tasks::{ActiveTask, TaskManager};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use tauri::{Emitter, WebviewWindow};
@@ -48,7 +48,8 @@ pub enum ProximityLevel {
 /// Constants for capsule expansion and safe edge positioning
 pub const EXPANSION_FACTOR: f32 = 3.5;
 pub const SCREEN_MARGIN: f32 = 10.0;
-pub const MEDIA_EXPANDED_WIDTH: f32 = 400.0;
+pub const DEFAULT_MEDIA_WIDTH: f32 = 360.0;
+pub const DEFAULT_MEDIA_HEIGHT: f32 = 60.0;
 
 /// Event payload emitted to the frontend for tracking, active tasks, and adaptive contrast.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -111,7 +112,7 @@ pub fn get_capsule_half_width(active_task_count: usize) -> f32 {
 }
 
 /// Computes the expanded bounds (left, right, center) for the capsule at anchor_x.
-/// - Media mode: expands to 400px width.
+/// - Media mode: uses content-adaptive dynamic width (280px-560px), defaulting to DEFAULT_MEDIA_WIDTH.
 /// - Standard mode: uses approximately 3.5x collapsed width.
 /// Clamped to screen boundaries [SCREEN_MARGIN, mon_width - SCREEN_MARGIN].
 /// - Near center: expands symmetrically around anchor_x.
@@ -121,11 +122,13 @@ pub fn compute_expanded_bounds(
     anchor_x: f32,
     active_task_count: usize,
     is_media_mode: bool,
+    media_custom_width: Option<f32>,
     mon_width: f32,
 ) -> (f32, f32, f32) {
     let safe_mon_width = mon_width.max(800.0);
     let target_w = if is_media_mode {
-        MEDIA_EXPANDED_WIDTH.min(safe_mon_width - 2.0 * SCREEN_MARGIN)
+        let desired = media_custom_width.unwrap_or(DEFAULT_MEDIA_WIDTH);
+        desired.min(safe_mon_width - 2.0 * SCREEN_MARGIN)
     } else {
         let collapsed_w = get_capsule_half_width(active_task_count) * 2.0;
         (collapsed_w * EXPANSION_FACTOR).min(safe_mon_width - 2.0 * SCREEN_MARGIN)
@@ -157,8 +160,13 @@ pub fn is_cursor_in_expanded_capsule(
     left: f32,
     right: f32,
     is_media_mode: bool,
+    media_custom_height: Option<f32>,
 ) -> bool {
-    let max_y = if is_media_mode { 68.0 } else { 42.0 };
+    let max_y = if is_media_mode {
+        media_custom_height.unwrap_or(DEFAULT_MEDIA_HEIGHT) + 8.0
+    } else {
+        42.0
+    };
     rel_y >= 0.0 && rel_y <= max_y && rel_x >= (left - 4.0) && rel_x <= (right + 4.0)
 }
 
@@ -202,6 +210,8 @@ pub fn start_proximity_detector(
     is_anchor_locked: Arc<AtomicBool>,
     is_capsule_expanded: Arc<AtomicBool>,
     is_media_mode: Arc<AtomicBool>,
+    dynamic_expanded_width: Arc<Mutex<Option<f32>>>,
+    dynamic_expanded_height: Arc<Mutex<Option<f32>>>,
     task_manager: TaskManager,
     config: ProximityConfig,
 ) {
@@ -254,12 +264,15 @@ pub fn start_proximity_detector(
                     let is_media = is_media_mode.load(Ordering::Relaxed);
 
                     if locked || is_expanded {
+                        let dyn_width = dynamic_expanded_width.lock().ok().and_then(|g| *g);
+                        let dyn_height = dynamic_expanded_height.lock().ok().and_then(|g| *g);
+
                         // While locked/expanded at anchor X, calculate interactive bounds
                         let (exp_left, exp_right, _exp_center) =
-                            compute_expanded_bounds(last_anchor_x, cached_tasks.len(), is_media, mon_width);
+                            compute_expanded_bounds(last_anchor_x, cached_tasks.len(), is_media, dyn_width, mon_width);
 
                         let in_capsule = if is_expanded {
-                            is_cursor_in_expanded_capsule(rel_x, rel_y, exp_left, exp_right, is_media)
+                            is_cursor_in_expanded_capsule(rel_x, rel_y, exp_left, exp_right, is_media, dyn_height)
                         } else {
                             is_cursor_in_capsule(rel_x, rel_y, last_anchor_x, cached_tasks.len())
                         };
@@ -269,7 +282,8 @@ pub fn start_proximity_detector(
 
                         // Auto-unlock/collapse if cursor moves far away from the capsule
                         let is_far_away = if is_expanded {
-                            let max_leave_y = if is_media { 88.0 } else { config.leave_threshold + 15.0 };
+                            let base_height = if is_media { dyn_height.unwrap_or(DEFAULT_MEDIA_HEIGHT) } else { 34.0 };
+                            let max_leave_y = base_height + 26.0;
                             rel_y > max_leave_y
                                 || rel_x < (exp_left - 30.0)
                                 || rel_x > (exp_right + 30.0)
@@ -283,6 +297,12 @@ pub fn start_proximity_detector(
                             is_anchor_locked.store(false, Ordering::Relaxed);
                             is_capsule_expanded.store(false, Ordering::Relaxed);
                             is_media_mode.store(false, Ordering::Relaxed);
+                            if let Ok(mut lock) = dynamic_expanded_width.lock() {
+                                *lock = None;
+                            }
+                            if let Ok(mut lock) = dynamic_expanded_height.lock() {
+                                *lock = None;
+                            }
                             update_ignore(true);
 
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
@@ -482,7 +502,7 @@ mod tests {
     fn test_expanded_capsule_geometry_center() {
         let mon_width = 1920.0f32;
         // 0 active tasks (collapsed width 92px -> 3.5x = 322px, half-width 161px)
-        let (left, right, center) = compute_expanded_bounds(960.0, 0, false, mon_width);
+        let (left, right, center) = compute_expanded_bounds(960.0, 0, false, None, mon_width);
         assert_eq!(center, 960.0);
         assert_eq!(left, 960.0 - 161.0);
         assert_eq!(right, 960.0 + 161.0);
@@ -493,7 +513,7 @@ mod tests {
     fn test_expanded_capsule_geometry_left_corner() {
         let mon_width = 1920.0f32;
         // Anchor near left bezel: anchor_x = 50.0
-        let (left, right, center) = compute_expanded_bounds(50.0, 0, false, mon_width);
+        let (left, right, center) = compute_expanded_bounds(50.0, 0, false, None, mon_width);
         assert_eq!(left, SCREEN_MARGIN); // Pinned to left margin (10.0)
         assert_eq!(right, 10.0 + 322.0); // 332.0
         assert_eq!(center, (10.0 + 332.0) / 2.0); // 171.0
@@ -505,7 +525,7 @@ mod tests {
     fn test_expanded_capsule_geometry_right_corner() {
         let mon_width = 1920.0f32;
         // Anchor near right bezel: anchor_x = 1890.0
-        let (left, right, center) = compute_expanded_bounds(1890.0, 0, false, mon_width);
+        let (left, right, center) = compute_expanded_bounds(1890.0, 0, false, None, mon_width);
         assert_eq!(right, mon_width - SCREEN_MARGIN); // 1910.0
         assert_eq!(left, 1910.0 - 322.0); // 1588.0
         assert_eq!(center, (1588.0 + 1910.0) / 2.0);
@@ -517,78 +537,86 @@ mod tests {
     fn test_expanded_capsule_factor_3_5() {
         let mon_width = 1920.0f32;
         // 1 active task (collapsed = 136px -> 3.5x = 476px)
-        let (left, right, _) = compute_expanded_bounds(960.0, 1, false, mon_width);
+        let (left, right, _) = compute_expanded_bounds(960.0, 1, false, None, mon_width);
         assert_eq!(right - left, 476.0);
 
         // 2 active tasks (collapsed = 172px -> 3.5x = 602px)
-        let (left, right, _) = compute_expanded_bounds(960.0, 2, false, mon_width);
+        let (left, right, _) = compute_expanded_bounds(960.0, 2, false, None, mon_width);
         assert_eq!(right - left, 602.0);
 
         // 3 active tasks (collapsed = 208px -> 3.5x = 728px)
-        let (left, right, _) = compute_expanded_bounds(960.0, 3, false, mon_width);
+        let (left, right, _) = compute_expanded_bounds(960.0, 3, false, None, mon_width);
         assert_eq!(right - left, 728.0);
     }
 
     #[test]
     fn test_expanded_hit_test_boundaries() {
-        let (left, right, _) = compute_expanded_bounds(960.0, 0, false, 1920.0);
+        let (left, right, _) = compute_expanded_bounds(960.0, 0, false, None, 1920.0);
         // Inside expanded bounds
-        assert!(is_cursor_in_expanded_capsule(960.0, 20.0, left, right, false));
-        assert!(is_cursor_in_expanded_capsule(left, 20.0, left, right, false));
-        assert!(is_cursor_in_expanded_capsule(right, 20.0, left, right, false));
+        assert!(is_cursor_in_expanded_capsule(960.0, 20.0, left, right, false, None));
+        assert!(is_cursor_in_expanded_capsule(left, 20.0, left, right, false, None));
+        assert!(is_cursor_in_expanded_capsule(right, 20.0, left, right, false, None));
 
         // Outside expanded bounds (horizontal)
-        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 20.0, left, right, false));
-        assert!(!is_cursor_in_expanded_capsule(right + 10.0, 20.0, left, right, false));
+        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 20.0, left, right, false, None));
+        assert!(!is_cursor_in_expanded_capsule(right + 10.0, 20.0, left, right, false, None));
 
         // Outside expanded bounds (vertical)
-        assert!(!is_cursor_in_expanded_capsule(960.0, 50.0, left, right, false));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 50.0, left, right, false, None));
     }
 
     #[test]
     fn test_media_expanded_bounds_center() {
         let mon_width = 1920.0f32;
-        // Media mode: target 400px width
-        let (left, right, center) = compute_expanded_bounds(960.0, 1, true, mon_width);
+        // Content-adaptive: test compact width 280px
+        let (left, right, center) = compute_expanded_bounds(960.0, 1, true, Some(280.0), mon_width);
         assert_eq!(center, 960.0);
-        assert_eq!(left, 960.0 - 200.0);
-        assert_eq!(right, 960.0 + 200.0);
-        assert_eq!(right - left, 400.0);
+        assert_eq!(left, 960.0 - 140.0);
+        assert_eq!(right, 960.0 + 140.0);
+        assert_eq!(right - left, 280.0);
+
+        // Content-adaptive: test wide width 480px
+        let (left_w, right_w, center_w) = compute_expanded_bounds(960.0, 1, true, Some(480.0), mon_width);
+        assert_eq!(center_w, 960.0);
+        assert_eq!(right_w - left_w, 480.0);
     }
 
     #[test]
     fn test_media_expanded_bounds_left_corner() {
         let mon_width = 1920.0f32;
-        // Anchor near left bezel: anchor_x = 50.0
-        let (left, right, center) = compute_expanded_bounds(50.0, 1, true, mon_width);
+        // Anchor near left bezel: anchor_x = 50.0 with 300px width
+        let (left, right, center) = compute_expanded_bounds(50.0, 1, true, Some(300.0), mon_width);
         assert_eq!(left, SCREEN_MARGIN); // 10.0
-        assert_eq!(right, 10.0 + 400.0); // 410.0
-        assert_eq!(center, (10.0 + 410.0) / 2.0); // 210.0
-        assert_eq!(right - left, 400.0);
+        assert_eq!(right, 10.0 + 300.0); // 310.0
+        assert_eq!(center, (10.0 + 310.0) / 2.0); // 160.0
+        assert_eq!(right - left, 300.0);
     }
 
     #[test]
     fn test_media_expanded_bounds_right_corner() {
         let mon_width = 1920.0f32;
-        // Anchor near right bezel: anchor_x = 1890.0
-        let (left, right, center) = compute_expanded_bounds(1890.0, 1, true, mon_width);
+        // Anchor near right bezel: anchor_x = 1890.0 with 320px width
+        let (left, right, center) = compute_expanded_bounds(1890.0, 1, true, Some(320.0), mon_width);
         assert_eq!(right, mon_width - SCREEN_MARGIN); // 1910.0
-        assert_eq!(left, 1910.0 - 400.0); // 1510.0
-        assert_eq!(center, (1510.0 + 1910.0) / 2.0); // 1710.0
-        assert_eq!(right - left, 400.0);
+        assert_eq!(left, 1910.0 - 320.0); // 1590.0
+        assert_eq!(center, (1590.0 + 1910.0) / 2.0);
+        assert_eq!(right - left, 320.0);
     }
 
     #[test]
     fn test_media_hit_test_boundaries() {
-        let (left, right, _) = compute_expanded_bounds(960.0, 1, true, 1920.0);
-        // In media mode, max_y is 68.0 to accommodate taller 60px capsule
-        assert!(is_cursor_in_expanded_capsule(960.0, 55.0, left, right, true));
-        assert!(is_cursor_in_expanded_capsule(left, 30.0, left, right, true));
-        assert!(is_cursor_in_expanded_capsule(right, 30.0, left, right, true));
+        let (left, right, _) = compute_expanded_bounds(960.0, 1, true, Some(340.0), 1920.0);
+        // Base height (60px) -> max_y is 68.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 55.0, left, right, true, Some(60.0)));
+        assert!(is_cursor_in_expanded_capsule(left, 30.0, left, right, true, Some(60.0)));
+        assert!(is_cursor_in_expanded_capsule(right, 30.0, left, right, true, Some(60.0)));
 
-        // Outside media bounds (vertical > 68)
-        assert!(!is_cursor_in_expanded_capsule(960.0, 75.0, left, right, true));
+        // Taller height (74px) -> max_y is 82.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 80.0, left, right, true, Some(74.0)));
+
+        // Outside media bounds (vertical > 82)
+        assert!(!is_cursor_in_expanded_capsule(960.0, 90.0, left, right, true, Some(74.0)));
         // Outside media bounds (horizontal)
-        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 30.0, left, right, true));
+        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 30.0, left, right, true, Some(60.0)));
     }
 }

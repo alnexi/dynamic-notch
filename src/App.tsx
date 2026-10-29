@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import "./App.css";
 import { ActiveTask, ContrastMode, ExpansionMode, ProximityLevel, ProximityPayload } from "./types/tasks";
 import { SmartCapsule } from "./components/SmartCapsule";
-import { computeCapsuleGeometry } from "./utils/geometry";
+import { computeCapsuleGeometry, MediaMetadataInput } from "./utils/geometry";
 
 function App() {
   const [proximity, setProximity] = useState<ProximityLevel>("idle");
@@ -40,16 +40,19 @@ function App() {
     }
   }, []);
 
-  const emitExpand = useCallback(async (mode: ExpansionMode = "standard") => {
-    if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
-      try {
-        const { emit } = await import("@tauri-apps/api/event");
-        await emit("nova-expand-capsule", { expanded: true, mode });
-      } catch (err) {
-        console.warn("Failed to emit nova-expand-capsule:", err);
+  const emitExpand = useCallback(
+    async (mode: ExpansionMode = "standard", width?: number, height?: number) => {
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        try {
+          const { emit } = await import("@tauri-apps/api/event");
+          await emit("nova-expand-capsule", { expanded: true, mode, width, height });
+        } catch (err) {
+          console.warn("Failed to emit nova-expand-capsule:", err);
+        }
       }
-    }
-  }, []);
+    },
+    []
+  );
 
   const emitCollapse = useCallback(async () => {
     if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
@@ -231,14 +234,34 @@ function App() {
     ? "tasks-count-2"
     : "tasks-count-many";
 
+  // Extract media metadata and secondary task counts for content-adaptive sizing
+  const mediaTask = activeTasks.find((t) => t.kind === "media");
+  const rightTasks = activeTasks.filter((t) => t.slot === "right");
+  const hasDuration = typeof mediaTask?.duration_seconds === "number" && mediaTask.duration_seconds > 0;
+
+  const mediaInput: MediaMetadataInput = {
+    title: mediaTask?.title,
+    artist: mediaTask?.subtitle || mediaTask?.icon_name,
+    hasDuration,
+    rightTasksCount: rightTasks.length,
+  };
+
   // Intelligently compute capsule geometry with boundary clamping and symmetrical or edge-favored expansion
   const geometry = computeCapsuleGeometry(
     offsetX,
     activeTasks.length,
     isExpanded,
     monitorWidth,
-    expansionMode
+    expansionMode,
+    mediaInput
   );
+
+  // Synchronize expanded dynamic width & height with Rust hit-test detector
+  useEffect(() => {
+    if (isExpanded) {
+      emitExpand(expansionMode, geometry.width, geometry.height);
+    }
+  }, [isExpanded, expansionMode, geometry.width, geometry.height, emitExpand]);
 
   return (
     <div
@@ -248,15 +271,19 @@ function App() {
         "--bubble-offset": `${geometry.centerX}px`,
         "--capsule-width": `${geometry.width}px`,
         "--capsule-height": `${geometry.height}px`,
+        "--capsule-radius": `${geometry.radius}px`,
+        "--media-title-lines": geometry.titleLines,
       } as React.CSSProperties}
     >
       {/* 
-        Nova Island — Dynamic Media Island Implementation (v0.4.0):
+        Nova Island — Content-Adaptive Capsule Geometry (v0.5.0):
         - Idle: 100% invisible, click-through everywhere.
         - Approaching: subtle curved glass protrusion.
-        - Hovered (Collapsed): compact capsule with centered clock + active tasks.
-        - Clicked on Media Icon: expands into Dynamic Media Island layout with 48x48 rounded artwork,
-          track title, artist, playback progress, and real controls to the right, plus clock on far right.
+        - Hovered (Collapsed): compact capsule with centered clock + active tasks (17px radius).
+        - Clicked on Media Icon: expands into Content-Adaptive Dynamic Media Island layout with
+          content-derived width (280px-560px), content-derived height (60px-74px),
+          proportional rounded-rectangle corner curvature (20px-24px, not an oversized pill),
+          title wrapping when constrained, and synchronized native hit-testing.
         - Clicked on Body: expands standard horizontally ~3.5x width.
         - Mouse leave: smooth upward retraction back to collapsed/idle state.
         - Fully transparent glass preserved across all states.

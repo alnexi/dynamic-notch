@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.5.0] - 2026-10-29
+
+### Summary
+Introduced Content-Adaptive Capsule Geometry for the expanded Media Island and corrected capsule roundness. Dimensions are now calculated dynamically from actual content (short titles produce a sleek compact width of ~280px-320px, normal titles ~340px-420px, and longer titles scale up to 560px within monitor margins; height expands to 74px when title wrapping is required). Semicircular pill roundness in the expanded state has been replaced by a sophisticated 20px-24px rounded-rectangle curvature, and native Tauri hit-testing is fully synchronized with content-derived dimensions.
+
+### Added
+- **Content-Adaptive Width & Height (`src/utils/geometry.ts`, `src/App.tsx`, `src/App.css`)**:
+  - Dynamically calculates the required capsule dimensions using exact canvas/system font text metrics:
+    - Fixed structural elements: 48x48 artwork, internal paddings, hairline divider, and centered clock/status section.
+    - Content section: Playback controls row, progress bar with timestamps, track title, and artist name.
+    - Short titles (e.g. "Boht"): Compact, proportionate capsule width (~280px-320px) rather than an inflated fixed width.
+    - Normal titles: Proportional width scaling (~340px-420px).
+    - Longer titles: Given additional space up to 560px when screen space allows.
+    - Title wrapping & height expansion: When horizontal space is constrained or for very long titles, the title gracefully wraps to 2 lines and the capsule expands in height from 60px to 74px without clipping or colliding with controls.
+    - Monitor boundary clamping: Strictly confines dimensions within `[SCREEN_MARGIN, monitor_width - SCREEN_MARGIN]`.
+- **Proportional Rounded-Rectangle Curvature (`src/App.css`, `src/utils/geometry.ts`)**:
+  - Replaced the oversized semicircular pill silhouette (`calc(height / 2)`) with a proportional 20px-24px rounded-rectangle corner radius (`--capsule-radius`) in the expanded state.
+  - Preserved the compact 17px pill radius in the collapsed state (34px height) with smooth CSS transitions (`border-radius 0.40s cubic-bezier(0.16, 1, 0.3, 1)`).
+  - Preserved the 10px rounded-rectangle album artwork corner radius (`--media-artwork-radius`), creating a balanced concentric curve hierarchy.
+  - Aligned specular reflection sheen (`.glass-specular`) with the updated corner radius.
+- **Synchronized Native Hit-Testing (`src-tauri/src/proximity.rs`, `src-tauri/src/lib.rs`, `src-tauri/tauri.conf.json`)**:
+  - Extended `start_proximity_detector` and `compute_expanded_bounds` with dynamic width and height synchronization via Tauri IPC events (`nova-expand-capsule`).
+  - Increased native window height to 100px in `tauri.conf.json` and `lib.rs` to comfortably host taller expanded capsules (up to 74px) and soft drop shadows without clipping.
+  - Win32 click-through detection dynamically covers the exact rendered footprint, maintaining 100% desktop click-through outside.
+
+---
+
 ## [0.4.1] - 2026-10-29
 
 ### Summary
