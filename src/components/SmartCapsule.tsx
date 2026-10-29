@@ -2,6 +2,7 @@ import { ActiveTask, ContrastMode, ExpansionMode } from "../types/tasks";
 import { Clock } from "./Clock";
 import { TaskIcon } from "./TaskIcon";
 import { MediaIsland, MediaMeasuredDimensionsPayload } from "./MediaIsland";
+import { MusicPlayerPanel } from "./MusicPlayerPanel";
 
 interface SmartCapsuleProps {
   activeTasks: ActiveTask[];
@@ -9,6 +10,12 @@ interface SmartCapsuleProps {
   expansionMode?: ExpansionMode;
   onMediaClick?: (e: React.MouseEvent) => void;
   onMediaDimensionsChange?: (dims: MediaMeasuredDimensionsPayload) => void;
+  isPlayerPanelOpen?: boolean;
+  onBackToBanner?: () => void;
+  isDeviceMenuOpen?: boolean;
+  setIsDeviceMenuOpen?: (open: boolean | ((prev: boolean) => boolean)) => void;
+  onDeviceCountChange?: (count: number) => void;
+  onExpandToPlayerPanel?: () => void;
 }
 
 export function SmartCapsule({
@@ -17,19 +24,39 @@ export function SmartCapsule({
   expansionMode = "none",
   onMediaClick,
   onMediaDimensionsChange,
+  isPlayerPanelOpen = false,
+  onBackToBanner,
+  isDeviceMenuOpen = false,
+  setIsDeviceMenuOpen,
+  onDeviceCountChange,
+  onExpandToPlayerPanel,
 }: SmartCapsuleProps) {
   const mediaTask = activeTasks.find((t) => t.kind === "media");
   const leftTasks = activeTasks.filter((t) => t.slot === "left");
   const rightTasks = activeTasks.filter((t) => t.slot === "right");
 
-  // Render the dedicated Dynamic Media Island when expanded in media mode
+  // Render dedicated Dynamic Media Island or Full Music Player Panel when in media mode
   if (expansionMode === "media" && mediaTask) {
+    if (isPlayerPanelOpen) {
+      return (
+        <MusicPlayerPanel
+          mediaTask={mediaTask}
+          contrastMode={contrastMode}
+          onBackToBanner={onBackToBanner || (() => {})}
+          isDeviceMenuOpen={isDeviceMenuOpen}
+          setIsDeviceMenuOpen={setIsDeviceMenuOpen || (() => {})}
+          onDeviceCountChange={onDeviceCountChange}
+        />
+      );
+    }
+
     return (
       <MediaIsland
         mediaTask={mediaTask}
         rightTasks={rightTasks}
         contrastMode={contrastMode}
         onDimensionsChange={onMediaDimensionsChange}
+        onBannerClick={onExpandToPlayerPanel}
       />
     );
   }

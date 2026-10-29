@@ -15,6 +15,7 @@ interface MediaIslandProps {
   rightTasks: ActiveTask[];
   contrastMode: ContrastMode;
   onDimensionsChange?: (dims: MediaMeasuredDimensionsPayload) => void;
+  onBannerClick?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -29,6 +30,7 @@ export function MediaIsland({
   rightTasks,
   contrastMode,
   onDimensionsChange,
+  onBannerClick,
 }: MediaIslandProps) {
   // Local optimistic playback tracking between 250ms backend polls
   const isPlaying = mediaTask.is_playing ?? false;
@@ -175,7 +177,13 @@ export function MediaIsland({
   }, [onDimensionsChange]);
 
   return (
-    <div className={`media-island-layout contrast-${contrastMode}`}>
+    <div
+      className={`media-island-layout contrast-${contrastMode}`}
+      onClick={onBannerClick}
+      title="Click to open player panel"
+      role="button"
+      tabIndex={0}
+    >
       {/* 
         High-fidelity DOM typography measurement nodes:
         - Detached/offscreen with visibility hidden and zero pointer events.

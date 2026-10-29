@@ -1,3 +1,4 @@
+mod audio;
 mod contrast;
 mod media;
 mod proximity;
@@ -47,6 +48,31 @@ fn media_next() -> bool {
 #[tauri::command]
 fn media_previous() -> bool {
     media::media_previous()
+}
+
+#[tauri::command]
+fn media_seek(seconds: f64) -> bool {
+    media::media_seek(seconds)
+}
+
+#[tauri::command]
+fn media_toggle_shuffle() -> bool {
+    media::media_toggle_shuffle()
+}
+
+#[tauri::command]
+fn media_cycle_repeat() -> Option<String> {
+    media::media_cycle_repeat()
+}
+
+#[tauri::command]
+fn get_audio_devices() -> Vec<audio::AudioDevice> {
+    audio::get_audio_output_devices()
+}
+
+#[tauri::command]
+fn set_audio_device(id: String) -> Result<bool, String> {
+    audio::set_default_audio_output_device(&id)
 }
 
 #[tauri::command]
@@ -109,6 +135,11 @@ pub fn run() {
             media_play_pause,
             media_next,
             media_previous,
+            media_seek,
+            media_toggle_shuffle,
+            media_cycle_repeat,
+            get_audio_devices,
+            set_audio_device,
             sync_capsule_geometry
         ])
         .setup(move |app| {

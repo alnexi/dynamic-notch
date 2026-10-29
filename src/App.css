@@ -797,3 +797,512 @@ html, body, #root {
   color: rgba(255, 255, 255, 0.82);
 }
 
+/* 
+  =============================================================================
+  Nova Island v0.7.0 — Professional Music Player Panel
+  - State B: Full downward-expanded music player panel inside dark translucent glass
+  - State C/D: Windows Core Audio output endpoints selection menu
+  =============================================================================
+*/
+
+.media-island-layout[role="button"] {
+  cursor: pointer;
+}
+
+.music-player-panel {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  padding: 12px 14px 10px 14px;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  gap: 10px;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 1. Panel Header Row */
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 8px;
+  transition: background 0.18s ease;
+}
+
+.panel-header-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panel-artwork-box {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.panel-artwork-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 10px;
+}
+
+.panel-artwork-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+}
+
+.panel-fallback-icon {
+  width: 24px;
+  height: 24px;
+  opacity: 0.72;
+}
+
+.panel-meta-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex: 1 1 0%;
+  min-width: 0;
+  gap: 2px;
+}
+
+.panel-track-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.2px;
+  line-height: 1.25;
+}
+
+.panel-track-artist {
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.72;
+  line-height: 1.2;
+}
+
+.panel-collapse-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  opacity: 0.65;
+  transition: opacity 0.15s ease, background 0.15s ease, transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.panel-collapse-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.panel-collapse-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+/* 2. Seek Bar Section */
+.panel-seek-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 4px;
+}
+
+.panel-seek-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 2px;
+  position: relative;
+  transition: height 0.15s ease;
+}
+
+.panel-seek-bar-track.seekable {
+  cursor: pointer;
+}
+
+.panel-seek-bar-track.seekable:hover {
+  height: 6px;
+}
+
+.panel-seek-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+.panel-seek-thumb {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.panel-seek-bar-track:hover .panel-seek-thumb {
+  opacity: 1;
+}
+
+.panel-seek-timestamps {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9.5px;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.65;
+  line-height: 1;
+}
+
+/* 3. Controls Row */
+.panel-controls-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  padding: 2px 0;
+}
+
+.panel-ctrl-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 6px;
+  margin: 0;
+  border-radius: 50%;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.panel-ctrl-btn svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.panel-ctrl-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  transform: scale(1.12);
+}
+
+.panel-ctrl-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.panel-ctrl-btn:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.panel-ctrl-btn.is-active {
+  color: #38bdf8;
+}
+
+.panel-ctrl-btn .active-dot {
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 3px;
+  background: #38bdf8;
+  border-radius: 50%;
+}
+
+.panel-ctrl-repeat .repeat-badge-one {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  font-size: 7.5px;
+  font-weight: 700;
+  color: #38bdf8;
+}
+
+.panel-ctrl-playpause {
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.panel-ctrl-playpause svg {
+  width: 19px;
+  height: 19px;
+}
+
+.panel-ctrl-playpause:hover {
+  background: rgba(255, 255, 255, 0.26);
+  transform: scale(1.08);
+}
+
+.panel-ctrl-playpause:active {
+  transform: scale(0.94);
+}
+
+/* Hairline Divider */
+.panel-divider {
+  width: 100%;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 1px 0;
+  flex-shrink: 0;
+}
+
+/* 4. Output Device Row */
+.panel-device-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  box-sizing: border-box;
+  transition: background 0.15s ease;
+}
+
+.panel-device-row:hover,
+.panel-device-row.is-open {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.device-row-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.device-row-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.85;
+}
+
+.device-row-label {
+  letter-spacing: 0.2px;
+}
+
+.device-row-right {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.device-current-name {
+  font-size: 10.5px;
+  opacity: 0.72;
+  max-width: 170px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.device-chevron {
+  width: 13px;
+  height: 13px;
+  opacity: 0.65;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.device-chevron.rotated {
+  transform: rotate(180deg);
+}
+
+/* 5. Device Menu List (State C / D) */
+.panel-device-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px;
+  background: rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  max-height: 145px;
+  overflow-y: auto;
+  box-sizing: border-box;
+  animation: deviceMenuFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes deviceMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-device-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.panel-device-menu::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.device-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.12s ease;
+}
+
+.device-menu-item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.device-menu-item.is-selected {
+  background: rgba(255, 255, 255, 0.16);
+  font-weight: 600;
+}
+
+.device-item-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 0%;
+}
+
+.device-item-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.device-item-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.device-item-check {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: #38bdf8;
+  margin-left: 6px;
+}
+
+.device-menu-empty {
+  padding: 8px;
+  font-size: 10.5px;
+  opacity: 0.6;
+  text-align: center;
+}
+
+/* Contrast Light Background adaptations */
+.contrast-light-bg .panel-track-title {
+  color: rgba(18, 22, 28, 0.94);
+}
+
+.contrast-light-bg .panel-track-artist,
+.contrast-light-bg .panel-seek-timestamps,
+.contrast-light-bg .device-current-name {
+  color: rgba(18, 22, 28, 0.70);
+}
+
+.contrast-light-bg .panel-seek-bar-track {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.contrast-light-bg .panel-seek-fill {
+  background: rgba(18, 22, 28, 0.90);
+}
+
+.contrast-light-bg .panel-divider {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.contrast-light-bg .panel-ctrl-playpause {
+  background: rgba(0, 0, 0, 0.10);
+}
+
+.contrast-light-bg .panel-ctrl-playpause:hover {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.contrast-light-bg .panel-device-menu {
+  background: rgba(255, 255, 255, 0.55);
+  border-color: rgba(0, 0, 0, 0.10);
+}
+
+.contrast-light-bg .device-menu-item:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.contrast-light-bg .device-menu-item.is-selected {
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.contrast-light-bg .device-item-check,
+.contrast-light-bg .panel-ctrl-btn.is-active,
+.contrast-light-bg .panel-ctrl-repeat .repeat-badge-one {
+  color: #0284c7;
+}
+
+.contrast-light-bg .panel-ctrl-btn .active-dot {
+  background: #0284c7;
+}
+
+

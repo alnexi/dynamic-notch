@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.7.0] - 2026-10-29
+
+### Summary
+Transformed the expanded media capsule into a professional interactive music player panel. Preserving the content-adaptive sizing, transparent glass appearance, media session integration, and desktop click-through behavior, v0.7.0 introduces full player panel interactions (State B) featuring real-time interactive seeking and scrubbing, GSMTC playback controls (Shuffle, Previous, prominent Play/Pause, Next, Repeat), and expandable Windows Core Audio output endpoint selection (State C & D) with COM `IPolicyConfig` default audio switching.
+
+### Added
+- **Full Music Player Panel (State B) (`src/components/MusicPlayerPanel.tsx`, `src/App.css`)**:
+  - Transformed the expanded banner layout on click into a downward-expanding dark translucent glass music player card ($390\text{px} \times 212\text{px}$, $26\text{px}$ radius).
+  - Top Section: 48×48px album artwork (10px rounded corners), bold track title, artist / app name, and collapse cue button. Clicking anywhere on the top header smoothly returns to State A (banner) without collapsing the entire app.
+  - As designed: strictly removed clock, bottom bar, and redundant secondary banners in State B.
+- **Interactive Seek Bar & Timers (`src/components/MusicPlayerPanel.tsx`, `src-tauri/src/media.rs`)**:
+  - Interactive scrubbing and seeking track with elapsed timestamp on left and total duration on right.
+  - Live progress fill and hover thumb knob with optimistic scrubbing feedback; dragging or clicking invokes native `media_seek` via GSMTC `TryChangePlaybackPositionAsync`.
+- **Full GSMTC Playback Controls Row (`src/components/MusicPlayerPanel.tsx`, `src-tauri/src/media.rs`, `src-tauri/src/tasks.rs`)**:
+  - Prominent 38×38px centered Play/Pause toggle button.
+  - Previous and Next skip buttons.
+  - Shuffle toggle with active illuminated state and status dot, reflecting real Windows media session shuffle state via `TryChangeShuffleActiveAsync`.
+  - Repeat mode cycle button (None $\to$ List/All $\to$ Track/One $\to$ None) with badge indicators, reflecting real Windows media repeat mode via `TryChangeAutoRepeatModeAsync`.
+  - Dimmed disabled states for unsupported operations according to GSMTC capabilities.
+- **Windows Core Audio Output Endpoint Enumeration & Switching (State C & D) (`src-tauri/src/audio.rs`, `src/components/MusicPlayerPanel.tsx`)**:
+  - Implemented real Windows Core Audio endpoint enumeration via COM `IMMDeviceEnumerator` (`eRender`, `DEVICE_STATE_ACTIVE`), retrieving friendly endpoint names and device forms (Speakers, Headphones, Bluetooth, Display).
+  - Implemented default audio endpoint switching via COM `IPolicyConfig` interface (`SetDefaultEndpoint` across Console, Multimedia, and Communications roles).
+  - Expandable "Output Device" row in player panel displaying active device name and rotating chevron; clicking expands downward into State C ($390\text{px} \times \sim 334\text{px}$).
+  - Endpoints menu highlights active default device with checkmark; clicking any endpoint switches default Windows audio output, updates UI state, and smoothly collapses back to State B.
+- **Dynamic Window Resizing & 100% Pass-Through Hit-Testing (`src/utils/geometry.ts`, `src-tauri/src/lib.rs`, `src-tauri/src/proximity.rs`)**:
+  - Geometry engine calculates State B panel dimensions ($390\text{px} \times 212\text{px}$) and State C device menu dimensions ($390\text{px} \times 320\text{px}\text{--}360\text{px}$).
+  - Dynamically synchronizes native Tauri window height (`(height + 36.0).max(100.0)`) preventing OS window clipping of the downward-expanded card and drop shadows.
+  - Proximity detector's dynamic hit testing adjusts bounds to match active panel height (`rel_y <= dyn_height + 8.0`), maintaining 100% desktop click-through outside the active panel footprint.
+
+---
+
 ## [0.6.1] - 2026-10-29
 
 ### Summary

@@ -16,6 +16,9 @@ function App() {
   const [contrastMode, setContrastMode] = useState<ContrastMode>("dark-bg");
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
   const [measuredMediaDims, setMeasuredMediaDims] = useState<MediaMeasuredDimensions>({});
+  const [isPlayerPanelOpen, setIsPlayerPanelOpen] = useState<boolean>(false);
+  const [isDeviceMenuOpen, setIsDeviceMenuOpen] = useState<boolean>(false);
+  const [deviceCount, setDeviceCount] = useState<number>(3);
   const isCollapsingRef = useRef<boolean>(false);
 
   // Helper to emit events to Rust backend
@@ -97,6 +100,8 @@ function App() {
               if (p.is_expanded !== undefined && !p.is_expanded && isExpanded) {
                 setIsExpanded(false);
                 setExpansionMode("none");
+                setIsPlayerPanelOpen(false);
+                setIsDeviceMenuOpen(false);
                 setMeasuredMediaDims({});
               }
               if (p.level === "hovered" || p.is_locked) {
@@ -105,6 +110,8 @@ function App() {
                 setIsActivated(false);
                 setIsExpanded(false);
                 setExpansionMode("none");
+                setIsPlayerPanelOpen(false);
+                setIsDeviceMenuOpen(false);
                 setMeasuredMediaDims({});
               }
             }
@@ -113,6 +120,8 @@ function App() {
           unlistenCollapse = await listen("nova-collapse", () => {
             setIsExpanded(false);
             setExpansionMode("none");
+            setIsPlayerPanelOpen(false);
+            setIsDeviceMenuOpen(false);
             setMeasuredMediaDims({});
           });
         } catch (err) {
@@ -150,6 +159,8 @@ function App() {
       if (e.key === "Escape") {
         setIsExpanded(false);
         setExpansionMode("none");
+        setIsPlayerPanelOpen(false);
+        setIsDeviceMenuOpen(false);
         setIsActivated(false);
         setProximity("idle");
         setMeasuredMediaDims({});
@@ -161,6 +172,8 @@ function App() {
     const handleBlur = () => {
       setIsExpanded(false);
       setExpansionMode("none");
+      setIsPlayerPanelOpen(false);
+      setIsDeviceMenuOpen(false);
       setIsActivated(false);
       setMeasuredMediaDims({});
       emitCollapse();
@@ -186,6 +199,8 @@ function App() {
       // Smooth automatic collapse on mouse leave without requiring another click
       setIsExpanded(false);
       setExpansionMode("none");
+      setIsPlayerPanelOpen(false);
+      setIsDeviceMenuOpen(false);
       setMeasuredMediaDims({});
       isCollapsingRef.current = true;
       setTimeout(() => {
@@ -276,6 +291,9 @@ function App() {
     hasDuration,
     rightTasksCount: rightTasks.length,
     measured: measuredMediaDims,
+    isPlayerPanelOpen,
+    isDeviceMenuOpen,
+    deviceCount,
   };
 
   // Intelligently compute capsule geometry with boundary clamping and symmetrical or edge-favored expansion
@@ -320,23 +338,18 @@ function App() {
       } as React.CSSProperties}
     >
       {/* 
-        Nova Island — True Content-Adaptive Capsule Geometry (v0.6.0):
-        - Idle: 100% invisible, click-through everywhere.
-        - Approaching: subtle curved glass protrusion.
-        - Hovered (Collapsed): compact capsule with centered clock + active tasks (17px radius).
-        - Clicked on Media Icon: expands into True Content-Adaptive Dynamic Media Island layout with
-          content-derived width without arbitrary caps, content-derived height (60px, 74px, 88px, 96px+)
-          adapting dynamically to multi-line wrapping and content stack requirements,
-          proportional rounded-rectangle corner curvature (20px-26px, never an oversized pill),
-          title wrapping when constrained, and synchronized native window resizing & hit-testing.
-        - Clicked on Body: expands standard horizontally ~3.5x width.
-        - Mouse leave: smooth upward retraction back to collapsed/idle state.
-        - Fully transparent glass preserved across all states.
+        Nova Island — Professional Music Player Panel (v0.7.0):
+        - State A: Compact expanded banner layout with responsive artwork, controls, and clock.
+        - State B: Full downward-expanded music player panel with seek bar, prominent controls, and output device selector.
+        - State C/D: Real Windows audio output endpoints menu.
+        - Preserves 100% desktop click-through outside the active panel footprint.
       */}
       <div
         className={`glass-bubble state-${effectiveState} ${taskCountClass} contrast-${contrastMode} ${
           isExpanded ? "is-expanded" : ""
-        } mode-${expansionMode}`}
+        } mode-${expansionMode} ${isPlayerPanelOpen ? "player-panel-open" : ""} ${
+          isDeviceMenuOpen ? "device-menu-open" : ""
+        }`}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
@@ -354,6 +367,17 @@ function App() {
             expansionMode={expansionMode}
             onMediaClick={handleMediaClick}
             onMediaDimensionsChange={handleMediaDimensionsChange}
+            isPlayerPanelOpen={isPlayerPanelOpen}
+            onBackToBanner={() => {
+              setIsPlayerPanelOpen(false);
+              setIsDeviceMenuOpen(false);
+            }}
+            isDeviceMenuOpen={isDeviceMenuOpen}
+            setIsDeviceMenuOpen={setIsDeviceMenuOpen}
+            onDeviceCountChange={setDeviceCount}
+            onExpandToPlayerPanel={() => {
+              setIsPlayerPanelOpen(true);
+            }}
           />
         )}
       </div>

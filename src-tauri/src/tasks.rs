@@ -34,6 +34,11 @@ pub struct ActiveTask {
     pub is_playing: Option<bool>,
     pub position_seconds: Option<f64>,
     pub duration_seconds: Option<f64>,
+    pub can_seek: Option<bool>,
+    pub can_shuffle: Option<bool>,
+    pub can_repeat: Option<bool>,
+    pub shuffle_active: Option<bool>,
+    pub repeat_mode: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -158,6 +163,11 @@ impl TaskManager {
                     is_playing: Some(media.is_playing),
                     position_seconds: media.position_seconds,
                     duration_seconds: media.duration_seconds,
+                    can_seek: Some(media.can_seek),
+                    can_shuffle: Some(media.can_shuffle),
+                    can_repeat: Some(media.can_repeat),
+                    shuffle_active: media.shuffle_active,
+                    repeat_mode: media.repeat_mode,
                 });
             }
         }
@@ -189,6 +199,11 @@ impl TaskManager {
                     is_playing: None,
                     position_seconds: None,
                     duration_seconds: None,
+                    can_seek: None,
+                    can_shuffle: None,
+                    can_repeat: None,
+                    shuffle_active: None,
+                    repeat_mode: None,
                 });
             }
         }
@@ -209,6 +224,11 @@ impl TaskManager {
                     is_playing: None,
                     position_seconds: None,
                     duration_seconds: None,
+                    can_seek: None,
+                    can_shuffle: None,
+                    can_repeat: None,
+                    shuffle_active: None,
+                    repeat_mode: None,
                 });
             }
         }

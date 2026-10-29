@@ -89,6 +89,9 @@ export interface MediaMetadataInput {
   hasDuration?: boolean;
   rightTasksCount?: number;
   measured?: MediaMeasuredDimensions;
+  isPlayerPanelOpen?: boolean;
+  isDeviceMenuOpen?: boolean;
+  deviceCount?: number;
 }
 
 export interface CapsuleGeometry {
@@ -158,6 +161,26 @@ export function computeMediaDimensions(
   const hasDuration = mediaInput?.hasDuration ?? false;
   const rightTasksCount = mediaInput?.rightTasksCount ?? 0;
   const measured = mediaInput?.measured;
+
+  // Nova Island v0.7.0 — Professional Music Player Panel dimensions:
+  // State B (panel open) & State C/D (device selection menu open)
+  if (mediaInput?.isPlayerPanelOpen) {
+    const targetWidth = Math.min(390, safeMonWidth - 2 * SCREEN_MARGIN);
+    let targetHeight = 212;
+    if (mediaInput.isDeviceMenuOpen) {
+      const dCount = Math.max(1, mediaInput.deviceCount ?? 3);
+      const listExtraHeight = Math.min(dCount * 36 + 14, 155);
+      targetHeight += listExtraHeight;
+    }
+    return {
+      width: targetWidth,
+      height: targetHeight,
+      radius: 26,
+      titleLines: 1,
+      artworkSize: 48,
+      artworkRadius: 10,
+    };
+  }
 
   // Determine initial target height:
   // - If measuredControlsHeight is available from rendered DOM, derive height from content stack + padding (14px).
@@ -354,7 +377,7 @@ export function computeCapsuleGeometry(
   const centerX = (left + right) / 2;
 
   // If corner clamping constrained the width more than the ideal width, re-evaluate wrapping & height
-  if (expansionMode === "media" && actualWidth < targetWidth) {
+  if (expansionMode === "media" && !mediaInput?.isPlayerPanelOpen && actualWidth < targetWidth) {
     const measuredRight = mediaInput?.measured?.measuredRightWidth;
     const rightSectionWidth = typeof measuredRight === "number" && measuredRight > 0
       ? measuredRight

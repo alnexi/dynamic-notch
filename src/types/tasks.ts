@@ -3,6 +3,13 @@ export type TaskSlot = "left" | "right";
 export type ContrastMode = "dark-bg" | "light-bg";
 export type ExpansionMode = "none" | "standard" | "media";
 
+export interface AudioDevice {
+  id: string;
+  name: string;
+  device_type: string;
+  is_default: boolean;
+}
+
 export interface ActiveTask {
   id: string;
   kind: TaskKind;
@@ -16,6 +23,11 @@ export interface ActiveTask {
   is_playing?: boolean;
   position_seconds?: number;
   duration_seconds?: number;
+  can_seek?: boolean;
+  can_shuffle?: boolean;
+  can_repeat?: boolean;
+  shuffle_active?: boolean;
+  repeat_mode?: "none" | "track" | "list";
 }
 
 export type ProximityLevel = "idle" | "approaching" | "near" | "hovered";

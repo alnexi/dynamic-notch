@@ -1,5 +1,6 @@
 use serde::Serialize;
 use std::sync::Mutex;
+use windows::Media::MediaPlaybackAutoRepeatMode;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession,
     GlobalSystemMediaTransportControlsSessionManager,
@@ -17,6 +18,11 @@ pub struct MediaSessionInfo {
     pub thumbnail_base64: Option<String>,
     pub position_seconds: Option<f64>,
     pub duration_seconds: Option<f64>,
+    pub can_seek: bool,
+    pub can_shuffle: bool,
+    pub can_repeat: bool,
+    pub shuffle_active: Option<bool>,
+    pub repeat_mode: Option<String>,
 }
 
 /// Cache holding (track_identifier_key, cached_thumbnail_base64) to avoid
@@ -81,6 +87,60 @@ pub fn media_previous() -> bool {
         op.join().unwrap_or(false)
     } else {
         false
+    }
+}
+
+pub fn media_seek(seconds: f64) -> bool {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return false; };
+    let Ok(manager) = async_op.join() else { return false; };
+    let Some(session) = get_best_session(&manager) else { return false; };
+    let pos_100ns = (seconds * 10_000_000.0).round() as i64;
+    if let Ok(op) = session.TryChangePlaybackPositionAsync(pos_100ns) {
+        op.join().unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+pub fn media_toggle_shuffle() -> bool {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return false; };
+    let Ok(manager) = async_op.join() else { return false; };
+    let Some(session) = get_best_session(&manager) else { return false; };
+    let Ok(info) = session.GetPlaybackInfo() else { return false; };
+    let current_shuffle = info.IsShuffleActive().ok().and_then(|r| r.Value().ok()).unwrap_or(false);
+    if let Ok(op) = session.TryChangeShuffleActiveAsync(!current_shuffle) {
+        op.join().unwrap_or(false)
+    } else {
+        false
+    }
+}
+
+pub fn media_cycle_repeat() -> Option<String> {
+    let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() else { return None; };
+    let Ok(manager) = async_op.join() else { return None; };
+    let Some(session) = get_best_session(&manager) else { return None; };
+    let Ok(info) = session.GetPlaybackInfo() else { return None; };
+    let current_mode = info
+        .AutoRepeatMode()
+        .ok()
+        .and_then(|r| r.Value().ok())
+        .unwrap_or(MediaPlaybackAutoRepeatMode::None);
+
+    let (next_mode, next_str) = match current_mode {
+        MediaPlaybackAutoRepeatMode::None => (MediaPlaybackAutoRepeatMode::List, "list"),
+        MediaPlaybackAutoRepeatMode::List => (MediaPlaybackAutoRepeatMode::Track, "track"),
+        MediaPlaybackAutoRepeatMode::Track => (MediaPlaybackAutoRepeatMode::None, "none"),
+        _ => (MediaPlaybackAutoRepeatMode::None, "none"),
+    };
+
+    if let Ok(op) = session.TryChangeAutoRepeatModeAsync(next_mode) {
+        if op.join().unwrap_or(false) {
+            Some(next_str.to_string())
+        } else {
+            None
+        }
+    } else {
+        None
     }
 }
 
@@ -226,6 +286,30 @@ pub fn get_current_media_session() -> Option<MediaSessionInfo> {
         }
     }
 
+    let mut can_seek = false;
+    let mut can_shuffle = false;
+    let mut can_repeat = false;
+    if let Ok(controls) = playback_info.Controls() {
+        can_seek = controls.IsPlaybackPositionEnabled().unwrap_or(false);
+        can_shuffle = controls.IsShuffleEnabled().unwrap_or(false);
+        can_repeat = controls.IsRepeatEnabled().unwrap_or(false);
+    }
+
+    let shuffle_active = playback_info
+        .IsShuffleActive()
+        .ok()
+        .and_then(|r| r.Value().ok());
+
+    let repeat_mode = playback_info
+        .AutoRepeatMode()
+        .ok()
+        .and_then(|r| r.Value().ok())
+        .map(|m| match m {
+            MediaPlaybackAutoRepeatMode::Track => "track".to_string(),
+            MediaPlaybackAutoRepeatMode::List => "list".to_string(),
+            _ => "none".to_string(),
+        });
+
     Some(MediaSessionInfo {
         is_playing,
         title,
@@ -235,12 +319,48 @@ pub fn get_current_media_session() -> Option<MediaSessionInfo> {
         thumbnail_base64,
         position_seconds,
         duration_seconds,
+        can_seek,
+        can_shuffle,
+        can_repeat,
+        shuffle_active,
+        repeat_mode,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Media::MediaPlaybackAutoRepeatMode;
+
+    #[test]
+    fn test_types() {
+        let _ = MediaPlaybackAutoRepeatMode::None;
+        let _ = MediaPlaybackAutoRepeatMode::Track;
+        let _ = MediaPlaybackAutoRepeatMode::List;
+        if let Ok(async_op) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync() {
+            if let Ok(manager) = async_op.join() {
+                if let Some(session) = get_best_session(&manager) {
+                    if let Ok(info) = session.GetPlaybackInfo() {
+                        if let Ok(shuffle_ref) = info.IsShuffleActive() {
+                            let val: Option<bool> = shuffle_ref.Value().ok();
+                            println!("shuffle value: {:?}", val);
+                        }
+                        if let Ok(repeat_ref) = info.AutoRepeatMode() {
+                            let val = repeat_ref.Value().ok();
+                            println!("repeat value: {:?}", val);
+                        }
+                        if let Ok(controls) = info.Controls() {
+                            let can_seek = controls.IsPlaybackPositionEnabled();
+                            let can_shuffle = controls.IsShuffleEnabled();
+                            let can_repeat = controls.IsRepeatEnabled();
+                            println!("can_seek: {:?}, can_shuffle: {:?}, can_repeat: {:?}", can_seek, can_shuffle, can_repeat);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 
     #[test]
     fn test_live_media_session() {

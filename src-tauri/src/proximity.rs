@@ -674,4 +674,24 @@ mod tests {
         assert!(is_cursor_in_expanded_capsule(960.0, 115.0, left, right, true, Some(110.0)));
         assert!(!is_cursor_in_expanded_capsule(960.0, 120.0, left, right, true, Some(110.0)));
     }
+
+    #[test]
+    fn test_music_player_panel_hit_testing() {
+        let mon_width = 1920.0f32;
+        let (left, right, center) = compute_expanded_bounds(960.0, 1, true, Some(390.0), mon_width);
+        assert_eq!(center, 960.0);
+        assert_eq!(right - left, 390.0);
+
+        // State B: Base music player panel height (212px) -> max_y is 220.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 215.0, left, right, true, Some(212.0)));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 225.0, left, right, true, Some(212.0)));
+
+        // State C: Expanded device menu height (334px) -> max_y is 342.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 338.0, left, right, true, Some(334.0)));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 345.0, left, right, true, Some(334.0)));
+
+        // Pass-through horizontally outside the 390px panel
+        assert!(!is_cursor_in_expanded_capsule(left - 10.0, 100.0, left, right, true, Some(212.0)));
+        assert!(!is_cursor_in_expanded_capsule(right + 10.0, 100.0, left, right, true, Some(212.0)));
+    }
 }
