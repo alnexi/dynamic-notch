@@ -1,13 +1,14 @@
 import { ActiveTask, ContrastMode, ExpansionMode } from "../types/tasks";
 import { Clock } from "./Clock";
 import { TaskIcon } from "./TaskIcon";
-import { MediaIsland } from "./MediaIsland";
+import { MediaIsland, MediaMeasuredDimensionsPayload } from "./MediaIsland";
 
 interface SmartCapsuleProps {
   activeTasks: ActiveTask[];
   contrastMode: ContrastMode;
   expansionMode?: ExpansionMode;
   onMediaClick?: (e: React.MouseEvent) => void;
+  onMediaDimensionsChange?: (dims: MediaMeasuredDimensionsPayload) => void;
 }
 
 export function SmartCapsule({
@@ -15,6 +16,7 @@ export function SmartCapsule({
   contrastMode,
   expansionMode = "none",
   onMediaClick,
+  onMediaDimensionsChange,
 }: SmartCapsuleProps) {
   const mediaTask = activeTasks.find((t) => t.kind === "media");
   const leftTasks = activeTasks.filter((t) => t.slot === "left");
@@ -27,6 +29,7 @@ export function SmartCapsule({
         mediaTask={mediaTask}
         rightTasks={rightTasks}
         contrastMode={contrastMode}
+        onDimensionsChange={onMediaDimensionsChange}
       />
     );
   }

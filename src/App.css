@@ -266,15 +266,17 @@ html, body, #root {
 }
 
 /* 
-  Expanded state on click (v0.3.0 - v0.5.0):
+  Expanded state on click (v0.3.0 - v0.6.0):
   - Standard mode: Approximately 3.5x collapsed width (34px height, 17px radius)
-  - Media mode: Content-adaptive width (280px-560px), height (60px-74px),
-    proportional rounded-rectangle corner radius (20px-24px, NOT an elongated pill)
+  - Media mode: True Content-Adaptive width (adapts to unconstrained text without arbitrary 560px cap),
+    height (60px, 74px, 88px, 96px+ adapting to content stack and multi-line wrapping),
+    proportional rounded-rectangle corner radius (20px-26px, NOT an elongated pill)
   - Retains 100% transparent glass appearance, specular sheen, and contrast
 */
 .glass-bubble.state-hovered.is-expanded {
   width: var(--capsule-width, 322px);
-  border-radius: var(--capsule-radius, 20px);
+  height: var(--capsule-height, 34px);
+  border-radius: var(--capsule-radius, 17px);
   cursor: default;
 }
 
@@ -496,6 +498,7 @@ html, body, #root {
   position: relative;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
   background: rgba(255, 255, 255, 0.08);
+  align-self: center;
 }
 
 .media-artwork-img {
@@ -525,16 +528,28 @@ html, body, #root {
 /* 
   2. Track Details & Controls Section (to the RIGHT of artwork)
   - Strictly allocated between artwork and divider/clock.
+  - Inner content wrapper maintains intrinsic natural height for stable measurement.
   - flex: 1 1 0% with min-width: 0 and overflow: hidden prevents flex blowouts.
 */
 .media-controls-container {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: stretch;
   flex: 1 1 0%;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
+}
+
+.media-controls-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   gap: 3px;
   box-sizing: border-box;
 }
@@ -672,11 +687,14 @@ html, body, #root {
 /* 3. Subtle vertical hairline divider */
 .media-section-divider {
   width: 1px;
-  height: 36px;
+  height: 60%;
+  min-height: 32px;
+  max-height: 52px;
   background: rgba(255, 255, 255, 0.14);
   flex-shrink: 0;
   margin: 0 2px;
   border-radius: 0.5px;
+  align-self: center;
 }
 
 /* 4. Right section: clock & status icons */
@@ -688,6 +706,7 @@ html, body, #root {
   gap: 4px;
   flex-shrink: 0;
   min-width: 48px;
+  align-self: center;
 }
 
 /* Contrast theme adjustments for Media Island */

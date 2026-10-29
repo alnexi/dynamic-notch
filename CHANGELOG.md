@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.6.0] - 2026-10-29
+
+### Summary
+Implemented True Content-Adaptive Capsule Sizing for Nova Island Media Island. Replaced estimation-only canvas text measurements with true rendered DOM measurements and unconstrained subpixel typography nodes, completely removed the arbitrary 560px width cap and 74px height ceiling, enabled dynamic vertical expansion (60px, 74px, 88px, 96px+) accommodating multi-line title wrapping and content stacks without feedback loops, and synchronized dynamic native Tauri window resizing and hit-test boundaries to preserve 100% desktop click-through outside the active capsule.
+
+### Added
+- **True Rendered DOM Measurement & Intrinsic Sizing (`src/components/MediaIsland.tsx`, `src/utils/geometry.ts`)**:
+  - Implemented high-fidelity offscreen measurement nodes using the exact DirectWrite / Blink typography engine, letter-spacing, and font glyph fallback for unconstrained title and artist dimensions.
+  - Added an inner content stack wrapper (`.media-controls-content`) with `height: auto` that cleanly separates intrinsic content measurements from the parent container's allocated dimensions.
+  - Attached a `ResizeObserver` and `useLayoutEffect` with threshold filtering (`diff > 2px`) to detect dynamic layout updates (such as multi-line wrapping) while strictly preventing resize feedback loops.
+- **Uncapped Content-Adaptive Width (`src/utils/geometry.ts`, `src/App.tsx`, `src/App.css`)**:
+  - Completely removed the legacy arbitrary 560px width cap (`MEDIA_MAX_WIDTH`).
+  - Wide track titles now expand smoothly horizontally (e.g. 600px, 700px, 800px+) across the screen when monitor space permits, keeping titles cleanly on a single line.
+  - Width is strictly constrained only by safe monitor bezel margins (`SCREEN_MARGIN = 10px`) and left/right corner proximity.
+- **True Content-Adaptive Height (`src/utils/geometry.ts`, `src/App.css`, `src/components/MediaIsland.tsx`)**:
+  - Completely eliminated the rigid 74px height ceiling (`MEDIA_WRAPPED_HEIGHT`).
+  - Expanded capsule height dynamically scales (60px base, 74px for 2-line wrapped titles, 88px for 3-line wrapped titles or denser controls stacks, up to 96px+ when required).
+  - Maintained concentric curve hierarchy with proportional rounded-rectangle corner radius scaling from 20px (60px height) to 26px (96px+ height), never degrading into an oversized pill shape.
+  - Kept 48x48 album artwork (`--media-artwork-radius: 10px`), divider, and clock/status area perfectly centered vertically across all dynamic heights.
+- **Dynamic Native Tauri Window Resizing & Hit-Test Synchronization (`src-tauri/src/lib.rs`, `src-tauri/src/proximity.rs`)**:
+  - Added dynamic native window height adjustment (`(height + 36.0).max(100.0)`) via `nova-expand-capsule` and `sync_capsule_geometry` command, ensuring expanded capsules and soft drop shadows are never clipped by the OS window boundary.
+  - Maintained window top-edge pinning with `(monitor_pos.x, monitor_pos.y)` during dynamic window resize operations.
+  - Instantly restores native window height to 100px upon collapse, dismissal, or timeout.
+  - Synchronized Rust hit-test detector and auto-collapse threshold (`max_leave_y = height + 26.0`) with dynamic heights, maintaining 100% click-through to Chrome tabs and desktop controls outside the dynamic capsule footprint.
+
+---
+
 ## [0.5.0] - 2026-10-29
 
 ### Summary

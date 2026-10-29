@@ -49,6 +49,50 @@ fn media_previous() -> bool {
     media::media_previous()
 }
 
+#[tauri::command]
+fn sync_capsule_geometry(
+    window: tauri::WebviewWindow,
+    width: f32,
+    height: f32,
+    is_expanded: bool,
+) -> bool {
+    let _ = width;
+    if is_expanded {
+        if let Ok(Some(monitor)) = window.primary_monitor() {
+            let monitor_pos = monitor.position();
+            let monitor_size = monitor.size();
+            let scale = monitor.scale_factor();
+            let target_h_logical = (height + 36.0).max(100.0);
+            let target_h_physical = (target_h_logical * scale as f32).round() as u32;
+            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                monitor_size.width,
+                target_h_physical,
+            )));
+            let _ = window.set_position(Position::Physical(PhysicalPosition {
+                x: monitor_pos.x,
+                y: monitor_pos.y,
+            }));
+            return true;
+        }
+    } else {
+        if let Ok(Some(monitor)) = window.primary_monitor() {
+            let monitor_pos = monitor.position();
+            let monitor_size = monitor.size();
+            let scale = monitor.scale_factor();
+            let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                monitor_size.width,
+                (100.0 * scale).round() as u32,
+            )));
+            let _ = window.set_position(Position::Physical(PhysicalPosition {
+                x: monitor_pos.x,
+                y: monitor_pos.y,
+            }));
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let task_manager = TaskManager::new();
@@ -64,7 +108,8 @@ pub fn run() {
             get_active_tasks,
             media_play_pause,
             media_next,
-            media_previous
+            media_previous,
+            sync_capsule_geometry
         ])
         .setup(move |app| {
             println!("[NovaIsland] Setting up main window...");
@@ -111,6 +156,10 @@ pub fn run() {
                 let width_unlock = Arc::clone(&dynamic_expanded_width);
                 let height_unlock = Arc::clone(&dynamic_expanded_height);
 
+                let window_expand = window.clone();
+                let window_collapse = window.clone();
+                let window_unlock = window.clone();
+
                 window.listen("nova-lock-anchor", move |_| {
                     println!("[NovaIsland] Anchor locked by frontend.");
                     lock_listener.store(true, Ordering::Relaxed);
@@ -127,6 +176,19 @@ pub fn run() {
                     if let Ok(mut lock) = height_unlock.lock() {
                         *lock = None;
                     }
+                    if let Ok(Some(monitor)) = window_unlock.primary_monitor() {
+                        let monitor_pos = monitor.position();
+                        let monitor_size = monitor.size();
+                        let scale = monitor.scale_factor();
+                        let _ = window_unlock.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                            monitor_size.width,
+                            (100.0 * scale).round() as u32,
+                        )));
+                        let _ = window_unlock.set_position(Position::Physical(PhysicalPosition {
+                            x: monitor_pos.x,
+                            y: monitor_pos.y,
+                        }));
+                    }
                 });
 
                 window.listen("nova-expand-capsule", move |event| {
@@ -136,6 +198,7 @@ pub fn run() {
                     let is_media = payload_str.contains("\"mode\":\"media\"");
                     media_mode_expand.store(is_media, Ordering::Relaxed);
 
+                    let mut target_h_opt = None;
                     // Parse dynamic dimensions passed by frontend
                     if let Ok(val) = serde_json::from_str::<serde_json::Value>(payload_str) {
                         if let Some(w) = val.get("width").and_then(|v| v.as_f64()) {
@@ -144,9 +207,29 @@ pub fn run() {
                             }
                         }
                         if let Some(h) = val.get("height").and_then(|v| v.as_f64()) {
+                            target_h_opt = Some(h as f32);
                             if let Ok(mut lock) = height_expand.lock() {
                                 *lock = Some(h as f32);
                             }
+                        }
+                    }
+
+                    // Dynamically resize native Tauri window if expanded height exceeds base bounds
+                    if let Some(target_h) = target_h_opt {
+                        if let Ok(Some(monitor)) = window_expand.primary_monitor() {
+                            let monitor_pos = monitor.position();
+                            let monitor_size = monitor.size();
+                            let scale = monitor.scale_factor();
+                            let required_h_logical = (target_h + 36.0).max(100.0);
+                            let target_h_physical = (required_h_logical * scale as f32).round() as u32;
+                            let _ = window_expand.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                                monitor_size.width,
+                                target_h_physical,
+                            )));
+                            let _ = window_expand.set_position(Position::Physical(PhysicalPosition {
+                                x: monitor_pos.x,
+                                y: monitor_pos.y,
+                            }));
                         }
                     }
                 });
@@ -160,6 +243,20 @@ pub fn run() {
                     }
                     if let Ok(mut lock) = height_collapse.lock() {
                         *lock = None;
+                    }
+
+                    if let Ok(Some(monitor)) = window_collapse.primary_monitor() {
+                        let monitor_pos = monitor.position();
+                        let monitor_size = monitor.size();
+                        let scale = monitor.scale_factor();
+                        let _ = window_collapse.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                            monitor_size.width,
+                            (100.0 * scale).round() as u32,
+                        )));
+                        let _ = window_collapse.set_position(Position::Physical(PhysicalPosition {
+                            x: monitor_pos.x,
+                            y: monitor_pos.y,
+                        }));
                     }
                 });
 

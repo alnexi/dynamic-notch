@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
-use tauri::{Emitter, WebviewWindow};
+use tauri::{Emitter, PhysicalPosition, Position, WebviewWindow};
 
 #[repr(C)]
 #[derive(Default, Clone, Copy, Debug)]
@@ -304,6 +304,19 @@ pub fn start_proximity_detector(
                                 *lock = None;
                             }
                             update_ignore(true);
+                            if let Ok(Some(monitor)) = window.primary_monitor() {
+                                let monitor_pos = monitor.position();
+                                let monitor_size = monitor.size();
+                                let scale = monitor.scale_factor();
+                                let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize::new(
+                                    monitor_size.width,
+                                    (100.0 * scale).round() as u32,
+                                )));
+                                let _ = window.set_position(Position::Physical(PhysicalPosition {
+                                    x: monitor_pos.x,
+                                    y: monitor_pos.y,
+                                }));
+                            }
 
                             current_level = if rel_y <= config.top_proximity_threshold && rel_y >= 0.0 {
                                 if rel_y <= config.near_threshold {
@@ -618,5 +631,47 @@ mod tests {
         assert!(!is_cursor_in_expanded_capsule(960.0, 90.0, left, right, true, Some(74.0)));
         // Outside media bounds (horizontal)
         assert!(!is_cursor_in_expanded_capsule(left - 10.0, 30.0, left, right, true, Some(60.0)));
+    }
+
+    #[test]
+    fn test_media_true_content_adaptive_width_without_arbitrary_caps() {
+        let mon_width = 1920.0f32;
+        // Test wide track title requiring 680px width: expands smoothly beyond legacy 560px cap
+        let (left, right, center) = compute_expanded_bounds(960.0, 1, true, Some(680.0), mon_width);
+        assert_eq!(center, 960.0);
+        assert_eq!(right - left, 680.0);
+        assert_eq!(left, 960.0 - 340.0);
+        assert_eq!(right, 960.0 + 340.0);
+
+        // Test very wide track title requiring 820px width
+        let (left_wide, right_wide, center_wide) = compute_expanded_bounds(960.0, 1, true, Some(820.0), mon_width);
+        assert_eq!(center_wide, 960.0);
+        assert_eq!(right_wide - left_wide, 820.0);
+        assert!(left_wide >= SCREEN_MARGIN);
+        assert!(right_wide <= mon_width - SCREEN_MARGIN);
+
+        // Clamping to screen width margin (1920 - 20 = 1900 max allowable)
+        let (left_max, right_max, _) = compute_expanded_bounds(960.0, 1, true, Some(2200.0), mon_width);
+        assert_eq!(right_max - left_max, 1900.0);
+        assert_eq!(left_max, SCREEN_MARGIN);
+        assert_eq!(right_max, mon_width - SCREEN_MARGIN);
+    }
+
+    #[test]
+    fn test_media_true_content_adaptive_height_and_hit_testing() {
+        let mon_width = 1920.0f32;
+        let (left, right, _) = compute_expanded_bounds(960.0, 1, true, Some(500.0), mon_width);
+
+        // 3-line wrapped title or extra content stack: height 88px -> max_y is 96.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 94.0, left, right, true, Some(88.0)));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 98.0, left, right, true, Some(88.0)));
+
+        // Large expanded content: height 96px -> max_y is 104.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 102.0, left, right, true, Some(96.0)));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 106.0, left, right, true, Some(96.0)));
+
+        // Extra tall content: height 110px -> max_y is 118.0
+        assert!(is_cursor_in_expanded_capsule(960.0, 115.0, left, right, true, Some(110.0)));
+        assert!(!is_cursor_in_expanded_capsule(960.0, 120.0, left, right, true, Some(110.0)));
     }
 }

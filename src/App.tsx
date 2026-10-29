@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import "./App.css";
 import { ActiveTask, ContrastMode, ExpansionMode, ProximityLevel, ProximityPayload } from "./types/tasks";
 import { SmartCapsule } from "./components/SmartCapsule";
-import { computeCapsuleGeometry, MediaMetadataInput } from "./utils/geometry";
+import { computeCapsuleGeometry, MediaMetadataInput, MediaMeasuredDimensions } from "./utils/geometry";
 
 function App() {
   const [proximity, setProximity] = useState<ProximityLevel>("idle");
@@ -15,6 +15,7 @@ function App() {
   });
   const [contrastMode, setContrastMode] = useState<ContrastMode>("dark-bg");
   const [activeTasks, setActiveTasks] = useState<ActiveTask[]>([]);
+  const [measuredMediaDims, setMeasuredMediaDims] = useState<MediaMeasuredDimensions>({});
   const isCollapsingRef = useRef<boolean>(false);
 
   // Helper to emit events to Rust backend
@@ -96,6 +97,7 @@ function App() {
               if (p.is_expanded !== undefined && !p.is_expanded && isExpanded) {
                 setIsExpanded(false);
                 setExpansionMode("none");
+                setMeasuredMediaDims({});
               }
               if (p.level === "hovered" || p.is_locked) {
                 setIsActivated(true);
@@ -103,6 +105,7 @@ function App() {
                 setIsActivated(false);
                 setIsExpanded(false);
                 setExpansionMode("none");
+                setMeasuredMediaDims({});
               }
             }
           });
@@ -110,6 +113,7 @@ function App() {
           unlistenCollapse = await listen("nova-collapse", () => {
             setIsExpanded(false);
             setExpansionMode("none");
+            setMeasuredMediaDims({});
           });
         } catch (err) {
           console.warn("Unable to subscribe to native events:", err);
@@ -148,6 +152,7 @@ function App() {
         setExpansionMode("none");
         setIsActivated(false);
         setProximity("idle");
+        setMeasuredMediaDims({});
         emitCollapse();
         emitUnlock();
       }
@@ -157,6 +162,7 @@ function App() {
       setIsExpanded(false);
       setExpansionMode("none");
       setIsActivated(false);
+      setMeasuredMediaDims({});
       emitCollapse();
       emitUnlock();
     };
@@ -180,6 +186,7 @@ function App() {
       // Smooth automatic collapse on mouse leave without requiring another click
       setIsExpanded(false);
       setExpansionMode("none");
+      setMeasuredMediaDims({});
       isCollapsingRef.current = true;
       setTimeout(() => {
         isCollapsingRef.current = false;
@@ -239,11 +246,36 @@ function App() {
   const rightTasks = activeTasks.filter((t) => t.slot === "right");
   const hasDuration = typeof mediaTask?.duration_seconds === "number" && mediaTask.duration_seconds > 0;
 
+  // Reset measured dimensions if song title or artist changes
+  const lastSongIdRef = useRef<string>("");
+  const currentSongKey = `${mediaTask?.title || ""}-${mediaTask?.subtitle || ""}`;
+  useEffect(() => {
+    if (lastSongIdRef.current !== currentSongKey) {
+      lastSongIdRef.current = currentSongKey;
+      setMeasuredMediaDims({});
+    }
+  }, [currentSongKey]);
+
+  const handleMediaDimensionsChange = useCallback((dims: MediaMeasuredDimensions) => {
+    setMeasuredMediaDims((prev) => {
+      if (
+        prev.naturalTitleWidth === dims.naturalTitleWidth &&
+        prev.naturalArtistWidth === dims.naturalArtistWidth &&
+        prev.measuredControlsHeight === dims.measuredControlsHeight &&
+        prev.measuredRightWidth === dims.measuredRightWidth
+      ) {
+        return prev;
+      }
+      return dims;
+    });
+  }, []);
+
   const mediaInput: MediaMetadataInput = {
     title: mediaTask?.title,
     artist: mediaTask?.subtitle || mediaTask?.icon_name,
     hasDuration,
     rightTasksCount: rightTasks.length,
+    measured: measuredMediaDims,
   };
 
   // Intelligently compute capsule geometry with boundary clamping and symmetrical or edge-favored expansion
@@ -256,10 +288,20 @@ function App() {
     mediaInput
   );
 
-  // Synchronize expanded dynamic width & height with Rust hit-test detector
+  // Synchronize expanded dynamic width & height with Rust hit-test detector & window size
   useEffect(() => {
     if (isExpanded) {
       emitExpand(expansionMode, geometry.width, geometry.height);
+
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) {
+        import("@tauri-apps/api/core").then(({ invoke }) => {
+          invoke("sync_capsule_geometry", {
+            width: geometry.width,
+            height: geometry.height,
+            isExpanded: true,
+          }).catch(() => {});
+        });
+      }
     }
   }, [isExpanded, expansionMode, geometry.width, geometry.height, emitExpand]);
 
@@ -276,14 +318,15 @@ function App() {
       } as React.CSSProperties}
     >
       {/* 
-        Nova Island — Content-Adaptive Capsule Geometry (v0.5.0):
+        Nova Island — True Content-Adaptive Capsule Geometry (v0.6.0):
         - Idle: 100% invisible, click-through everywhere.
         - Approaching: subtle curved glass protrusion.
         - Hovered (Collapsed): compact capsule with centered clock + active tasks (17px radius).
-        - Clicked on Media Icon: expands into Content-Adaptive Dynamic Media Island layout with
-          content-derived width (280px-560px), content-derived height (60px-74px),
-          proportional rounded-rectangle corner curvature (20px-24px, not an oversized pill),
-          title wrapping when constrained, and synchronized native hit-testing.
+        - Clicked on Media Icon: expands into True Content-Adaptive Dynamic Media Island layout with
+          content-derived width without arbitrary caps, content-derived height (60px, 74px, 88px, 96px+)
+          adapting dynamically to multi-line wrapping and content stack requirements,
+          proportional rounded-rectangle corner curvature (20px-26px, never an oversized pill),
+          title wrapping when constrained, and synchronized native window resizing & hit-testing.
         - Clicked on Body: expands standard horizontally ~3.5x width.
         - Mouse leave: smooth upward retraction back to collapsed/idle state.
         - Fully transparent glass preserved across all states.
@@ -308,6 +351,7 @@ function App() {
             contrastMode={contrastMode}
             expansionMode={expansionMode}
             onMediaClick={handleMediaClick}
+            onMediaDimensionsChange={handleMediaDimensionsChange}
           />
         )}
       </div>

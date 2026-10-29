@@ -1,7 +1,7 @@
-import { ExpansionMode } from "../types/tasks";
+import type { ExpansionMode } from "../types/tasks";
 
 /**
- * Nova Island — Content-Adaptive Capsule Geometry & Expansion Math (v0.5.0)
+ * Nova Island — True Content-Adaptive Capsule Geometry & Expansion Math (v0.6.0)
  */
 
 /**
@@ -12,11 +12,11 @@ export const EXPANSION_FACTOR = 3.5;
 
 /**
  * Bounds for content-adaptive Media Island dimensions.
+ * Note: Width and height have NO arbitrary upper caps (such as the legacy 560px or 74px limits).
+ * They adapt purely to actual rendered content, constrained only by monitor margins and corner geometry.
  */
 export const MEDIA_MIN_WIDTH = 280;
-export const MEDIA_MAX_WIDTH = 560;
 export const MEDIA_BASE_HEIGHT = 60;
-export const MEDIA_WRAPPED_HEIGHT = 74;
 export const COLLAPSED_HEIGHT = 34;
 export const COLLAPSED_RADIUS = 17;
 
@@ -46,11 +46,20 @@ export function getCollapsedWidth(activeTaskCount: number): number {
   }
 }
 
+export interface MediaMeasuredDimensions {
+  naturalTitleWidth?: number;
+  naturalArtistWidth?: number;
+  measuredControlsWidth?: number;
+  measuredControlsHeight?: number;
+  measuredRightWidth?: number;
+}
+
 export interface MediaMetadataInput {
   title?: string;
   artist?: string;
   hasDuration?: boolean;
   rightTasksCount?: number;
+  measured?: MediaMeasuredDimensions;
 }
 
 export interface CapsuleGeometry {
@@ -90,12 +99,16 @@ export function measureTextWidth(text: string, font: string, charFallbackRatio: 
 
 /**
  * Computes content-adaptive dimensions for the expanded Media Island:
- * - Accounts for 48x48 artwork, track title width, artist width, controls, progress track, clock, dividers, and padding.
+ * - Uses true rendered DOM measurements when available; falls back to high-fidelity font metrics.
+ * - Accounts for 48x48 artwork, unconstrained title width, artist width, controls row, progress track, clock, dividers, and padding.
  * - Short titles: compact, proportionate width (~280px-320px).
- * - Normal titles: appropriately scaled width (~340px-420px).
- * - Long titles: expands width up to 560px (clamped to monitor boundaries).
- * - If available width is constrained and title genuinely requires more space, wraps to 2 lines and expands height to 74px.
- * - Sophisticated rounded-rectangle radius: 20px (base 60px height) or 23px (74px height), completely eliminating oversized pill silhouettes.
+ * - Normal titles: appropriately scaled width (~340px-440px).
+ * - Long titles: expands width dynamically (600px, 700px, 800px+) without premature arbitrary 560px capping,
+ *   constrained only by monitor bezel margins and corner proximity.
+ * - Dynamic height: removes arbitrary 74px ceiling; expands vertically (e.g. 74px, 84px, 96px) when title
+ *   wraps onto multiple lines or content stack requires it.
+ * - Proportional rounded-rectangle radius: 20px (base 60px height) scaling to 26px for taller heights,
+ *   completely eliminating oversized pill silhouettes.
  */
 export function computeMediaDimensions(
   mediaInput: MediaMetadataInput | undefined,
@@ -105,40 +118,53 @@ export function computeMediaDimensions(
   const artist = mediaInput?.artist || "";
   const hasDuration = mediaInput?.hasDuration ?? false;
   const rightTasksCount = mediaInput?.rightTasksCount ?? 0;
+  const measured = mediaInput?.measured;
 
   // Structural overhead:
   // Left pad (6) + Artwork (48) + Gap (10) + Controls padding (12) +
   // Gap (10) + Divider (1) + Divider margins (4) + Gap (10) +
-  // Clock (46) + Secondary tasks (rightTasksCount * 22) + Right pad (10)
-  const structuralWidth = 147 + rightTasksCount * 22;
+  // Clock & Secondary tasks (measured or calculated) + Right pad (10)
+  const measuredRight = measured?.measuredRightWidth;
+  const rightSectionWidth = typeof measuredRight === "number" && measuredRight > 0
+    ? measuredRight
+    : 46 + rightTasksCount * 22;
 
-  // Measure title and artist text widths
-  const titleWidth = measureTextWidth(
-    title,
-    "600 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    6.8
-  );
-  const artistWidth = measureTextWidth(
-    artist,
-    "400 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    5.6
-  );
+  const structuralWidth = 6 + 48 + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
+
+  // Natural unconstrained text widths: prefer DOM measured widths when available
+  const titleWidth = typeof measured?.naturalTitleWidth === "number" && measured.naturalTitleWidth > 0
+    ? measured.naturalTitleWidth
+    : measureTextWidth(
+        title,
+        "600 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        6.8
+      );
+
+  const artistWidth = typeof measured?.naturalArtistWidth === "number" && measured.naturalArtistWidth > 0
+    ? measured.naturalArtistWidth
+    : measureTextWidth(
+        artist,
+        "400 10px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        5.6
+      );
 
   // Minimum required content width for playback controls row & progress track
-  const minControlsWidth = hasDuration ? 120 : 80;
+  const minControlsWidth = typeof measured?.measuredControlsWidth === "number" && measured.measuredControlsWidth > 0
+    ? measured.measuredControlsWidth
+    : (hasDuration ? 120 : 80);
+
   const maxContentTextWidth = Math.max(titleWidth, artistWidth);
   const neededControlsWidth = Math.max(maxContentTextWidth, minControlsWidth) + 12;
 
   const idealTotalWidth = Math.round(structuralWidth + neededControlsWidth);
 
-  // Maximum allowable width on monitor with safety margins
+  // Maximum allowable width on monitor with safety margins (NO arbitrary 560px cap)
   const maxMonitorAllowable = safeMonWidth - 2 * SCREEN_MARGIN;
-  const maxTargetWidth = Math.min(MEDIA_MAX_WIDTH, maxMonitorAllowable);
 
-  // Clamped target width
-  let targetWidth = Math.max(MEDIA_MIN_WIDTH, Math.min(idealTotalWidth, maxTargetWidth));
+  // Clamped target width: can scale smoothly up to monitor width limit
+  let targetWidth = Math.max(MEDIA_MIN_WIDTH, Math.min(idealTotalWidth, maxMonitorAllowable));
 
-  // Determine whether title fits on 1 line or needs wrapping to 2 lines
+  // Determine whether title fits on 1 line or needs wrapping
   const availableTextWidth = targetWidth - structuralWidth - 12;
   const titleNeedsWrapping = titleWidth > availableTextWidth;
 
@@ -146,27 +172,42 @@ export function computeMediaDimensions(
   let titleLines = 1;
 
   if (titleNeedsWrapping) {
-    // If screen space permits expanding width a bit more before wrapping, try to expand up to maxTargetWidth
-    if (targetWidth < maxTargetWidth) {
-      const expandedTarget = Math.min(maxTargetWidth, Math.round(structuralWidth + titleWidth + 16));
+    // If screen space permits expanding width a bit more before wrapping, try to expand up to maxMonitorAllowable
+    if (targetWidth < maxMonitorAllowable) {
+      const expandedTarget = Math.min(maxMonitorAllowable, Math.round(structuralWidth + titleWidth + 16));
       targetWidth = Math.max(targetWidth, expandedTarget);
       const newAvail = targetWidth - structuralWidth - 12;
       if (titleWidth > newAvail) {
-        targetHeight = MEDIA_WRAPPED_HEIGHT;
-        titleLines = 2;
+        titleLines = titleWidth > newAvail * 1.85 ? 3 : 2;
       }
     } else {
-      // Width is already at maximum allowable; wrap title and increase height
-      targetHeight = MEDIA_WRAPPED_HEIGHT;
-      titleLines = 2;
+      titleLines = titleWidth > availableTextWidth * 1.85 ? 3 : 2;
+    }
+  }
+
+  // True Content-Adaptive Height:
+  // If DOM measuredControlsHeight is available, calculate height directly from content stack:
+  // content stack + top/bottom capsule padding (14px)
+  if (typeof measured?.measuredControlsHeight === "number" && measured.measuredControlsHeight > 0) {
+    const neededFromContent = Math.round(measured.measuredControlsHeight + 14);
+    targetHeight = Math.max(MEDIA_BASE_HEIGHT, neededFromContent);
+  } else {
+    // Fallback based on wrapped line count
+    if (titleLines === 3) {
+      targetHeight = 88;
+    } else if (titleLines === 2) {
+      targetHeight = 74;
+    } else {
+      targetHeight = MEDIA_BASE_HEIGHT;
     }
   }
 
   // Calculate sophisticated rounded-rectangle corner radius:
-  // For 60px height: 20px radius.
-  // For 74px height: 23px radius.
-  // Proportional rounded rectangle rather than an elongated pill (which would be 30px / 37px)
-  const radius = Math.round(Math.min(24, Math.max(18, targetHeight * 0.32)));
+  // 60px height -> 20px radius.
+  // 74px height -> 21px radius.
+  // 88px height -> 25px radius.
+  // Proportional rounded rectangle rather than an elongated pill
+  const radius = Math.round(Math.min(26, Math.max(20, targetHeight * 0.28)));
 
   return {
     width: targetWidth,
@@ -181,11 +222,13 @@ export function computeMediaDimensions(
  * - Collapsed state: centered at anchorX, clamped within screen margins (radius 17px).
  * - Expanded state:
  *   - Standard mode: 3.5x collapsed width, 34px height, 17px radius.
- *   - Media mode: Content-adaptive width (280px-560px), content-adaptive height (60px-74px),
- *     proportional rounded-rectangle radius (20px-24px).
+ *   - Media mode: Content-adaptive width (no arbitrary 560px cap), content-adaptive height (no 74px cap),
+ *     proportional rounded-rectangle radius (20px-26px).
  *   - Symmetrical around anchorX when sufficient room exists on both sides.
  *   - Near left corner: pins to left margin and expands rightward, strictly avoiding clipping.
  *   - Near right corner: pins to right margin and expands leftward, strictly avoiding clipping.
+ *   - If corner constraints squeeze available width below unconstrained single-line width,
+ *     intelligently wraps title and dynamically increases height.
  */
 export function computeCapsuleGeometry(
   anchorX: number,
@@ -255,6 +298,32 @@ export function computeCapsuleGeometry(
 
   const actualWidth = right - left;
   const centerX = (left + right) / 2;
+
+  // If corner clamping constrained the width more than the ideal width, re-evaluate wrapping & height
+  if (expansionMode === "media" && actualWidth < targetWidth) {
+    const measuredRight = mediaInput?.measured?.measuredRightWidth;
+    const rightSectionWidth = typeof measuredRight === "number" && measuredRight > 0
+      ? measuredRight
+      : 46 + (mediaInput?.rightTasksCount ?? 0) * 22;
+    const structuralWidth = 6 + 48 + 10 + 12 + 10 + 5 + 10 + rightSectionWidth + 10;
+    const availableTextWidth = actualWidth - structuralWidth - 12;
+
+    const titleWidth = typeof mediaInput?.measured?.naturalTitleWidth === "number" && mediaInput.measured.naturalTitleWidth > 0
+      ? mediaInput.measured.naturalTitleWidth
+      : measureTextWidth(
+          mediaInput?.title || "",
+          "600 11.5px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+          6.8
+        );
+
+    if (titleWidth > availableTextWidth) {
+      titleLines = titleWidth > availableTextWidth * 1.85 ? 3 : 2;
+      if (!mediaInput?.measured?.measuredControlsHeight) {
+        targetHeight = titleLines === 3 ? 88 : 74;
+        radius = Math.round(Math.min(26, Math.max(20, targetHeight * 0.28)));
+      }
+    }
+  }
 
   return {
     width: actualWidth,
