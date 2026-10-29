@@ -2,7 +2,7 @@
 
 Nova Island is a lightweight, native Windows desktop application inspired by the Dynamic Island concept. Built with **Tauri 2**, **React 19**, **TypeScript**, **Vite 8**, and **Rust**, it lives along the top edge of the primary monitor as an unobtrusive, pointer-anchored transparent glass protrusion that smoothly tracks cursor proximity and expands into a sleek, translucent interaction capsule right at the pointer's location.
 
-**Current Version:** `0.4.0`  
+**Current Version:** `0.4.1`  
 **Changelog:** [CHANGELOG.md](file:///d:/New%20folder%20(2)/CHANGELOG.md)
 
 ---

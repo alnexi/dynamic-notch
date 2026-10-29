@@ -20,6 +20,12 @@ export function MediaIsland({ mediaTask, rightTasks, contrastMode }: MediaIsland
   // Local optimistic playback tracking between 250ms backend polls
   const isPlaying = mediaTask.is_playing ?? false;
   const [currentPos, setCurrentPos] = useState<number>(mediaTask.position_seconds ?? 0);
+  const [imgError, setImgError] = useState<boolean>(false);
+
+  // Reset imgError whenever the artwork URL/data URI changes
+  useEffect(() => {
+    setImgError(false);
+  }, [mediaTask.icon_base64]);
 
   useEffect(() => {
     if (typeof mediaTask.position_seconds === "number") {
@@ -80,19 +86,20 @@ export function MediaIsland({ mediaTask, rightTasks, contrastMode }: MediaIsland
       {/* 
         1. Large Album Artwork on the Left:
         - Occupies full vertical area (48x48px in 60px capsule with 6px inset).
-        - Smoothly grows from the small 18px icon.
-        - Outer corner radius (22px) visually matches the capsule curvature.
+        - Controlled rounded-rectangle corners (--media-artwork-radius: 10px) visually matching capsule curvature.
+        - Graceful fallback with zero broken image artifacts on load error.
       */}
       <div className="media-artwork-container">
-        {mediaTask.icon_base64 ? (
+        {mediaTask.icon_base64 && !imgError ? (
           <img
             src={mediaTask.icon_base64}
             alt={mediaTask.title}
             className="media-artwork-img"
             loading="eager"
+            onError={() => setImgError(true)}
           />
         ) : (
-          <div className="media-artwork-fallback">
+          <div className="media-artwork-fallback" title="No album artwork available">
             <svg viewBox="0 0 24 24" fill="currentColor" className="media-artwork-fallback-icon">
               <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
             </svg>

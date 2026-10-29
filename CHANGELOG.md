@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.4.1] - 2026-10-29
+
+### Summary
+Fixed missing album artwork from Windows Media Player (uncompressed BMP/large stream support, dynamic MIME detection, and non-blocking in-memory thumbnail caching), constrained long track titles and artist names with single-line ellipsis to eliminate text overflow and collision with capsule boundaries or controls, and corrected album artwork corner curvature to a controlled 10px rounded-rectangle matching the capsule's visual language.
+
+### Fixed
+- **Long Track Titles & Text Overflow (`src/App.css`, `src/components/MediaIsland.tsx`)**:
+  - Constrained `.media-controls-container` with `flex: 1 1 0%`, `min-width: 0`, and `overflow: hidden`, strictly bounding the text region between the artwork and the right-side divider/clock.
+  - Applied `min-width: 0`, `max-width: 100%`, `overflow: hidden`, and `text-overflow: ellipsis` on both `.media-track-info`, `.media-title`, and `.media-artist`.
+  - Long song titles and artist names now truncate cleanly on a single line with an ellipsis (`...`) without overflowing the capsule, colliding with the clock, playback controls, artwork, or screen bezels.
+  - Preserved typography, line height, and spacing for normal and short titles.
+- **Windows Media Player Album Artwork Retrieval (`src-tauri/src/media.rs`)**:
+  - Fixed silent thumbnail rejection: Windows Media Player (`Microsoft.ZuneMusic`) frequently serves uncompressed bitmaps (`image/bmp`) exceeding 2MB (e.g. 2.25MB+). Increased stream size limit to 15MB to support high-resolution uncompressed covers.
+  - Dynamic MIME detection: Rather than hardcoding `data:image/jpeg;base64`, the backend now inspects `stream.ContentType()` and binary magic bytes (`image/bmp`, `image/png`, `image/jpeg`, `image/webp`, `image/gif`) to construct valid, browser-compatible data URIs.
+  - Session fallback (`get_best_session`): If `GetCurrentSession()` returns None, the manager queries `GetSessions()` for active `Playing` or `Paused` sessions.
+  - In-memory thumbnail caching (`THUMBNAIL_CACHE`): Caches encoded thumbnail data URIs by `source_app|title|artist` to prevent redundant disk/stream reads and base64 encoding on every 250ms proximity tick, ensuring completely non-blocking UI and instantaneous responsiveness.
+  - Graceful frontend fallback: Added `onError` handling on artwork image elements in `MediaIsland.tsx` to automatically display the clean fallback icon without broken image glyphs.
+- **Album Artwork Corner Curvature (`src/App.css`, `src/components/MediaIsland.tsx`)**:
+  - Replaced the excessively rounded 22px radius (which gave the 48px square artwork a near-circular disc appearance) with a controlled 10px rounded-rectangle radius (`--media-artwork-radius: 10px`).
+  - The artwork now presents an authentic album sleeve appearance whose four corners visually match the capsule's rounded contour without appearing circular or sharply square.
+  - Maintained crisp `overflow: hidden` image clipping with zero pixel bleed or transparent gaps.
+
+---
+
 ## [0.4.0] - 2026-10-28
 
 ### Summary
